@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# SMM Initialization 
+#
+# This driver provides initialization (ownership) of SMM to the Linux kernel.
+# Only useful once running compiling kernel to be used as coreboot payload (LinuxBootSMM).
+
+menu "SMM Initialization"
+
+config SMM_INIT
+	bool "SMM initialization (LinuxBootSMM)"
+	default n
+	help
+	  Enables driver for initializing System Management Mode (SMM).
+	  Only to be used when compiling as kernel for coreboot + LinuxBootSMM
+	  setup.
+	
+endmenu
