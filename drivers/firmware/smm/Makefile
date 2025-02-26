@@ -21,6 +21,14 @@ default:
 # relocation: smm_init_reloc.o
 # 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 #
+
+clean:
+	rm -f smm_*.mod
+	rm -f smm_*.mod.*
+	rm -f smm_*.ko
+	rm -f smm_*.o
+	rm -f module.order
+	rm -f Module.symver
 help:
 	@echo "Available targets:"
 	@echo "  all          - Build all modules" 
