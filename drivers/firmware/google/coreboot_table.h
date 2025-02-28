@@ -41,7 +41,6 @@ struct lb_cbmem_ref {
 };
 
 #define LB_TAG_CBMEM_ENTRY 0x31
-
 /* Corresponds to LB_TAG_CBMEM_ENTRY */
 struct lb_cbmem_entry {
 	u32 tag;
@@ -50,6 +49,20 @@ struct lb_cbmem_entry {
 	u64 address;
 	u32 entry_size;
 	u32 id;
+};
+
+#define CB_TAG_PLD_SMM_SMRAM          0x51
+struct lb_pld_smram_descriptor {
+	u64 physical_start;
+	u64 physical_size;
+	u64 region_state;
+};
+
+struct lb_pld_smram_descriptor_block {
+	u32 tag;
+	u32 size;
+	u32 number_of_smm_regions;
+	struct lb_pld_smram_descriptor descriptor[1];
 };
 
 /* Describes framebuffer setup by coreboot */
@@ -80,6 +93,7 @@ struct coreboot_device {
 		struct lb_cbmem_ref cbmem_ref;
 		struct lb_cbmem_entry cbmem_entry;
 		struct lb_framebuffer framebuffer;
+		struct lb_pld_smram_descriptor_block smram_info;
 		DECLARE_FLEX_ARRAY(u8, raw);
 	};
 };
