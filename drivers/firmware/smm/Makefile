@@ -3,14 +3,16 @@
 # obj-y += smm_loader.o commented out for now, uncomment for full build
 # This is for testing purposes
 
-obj-m := smm_loader.o
+#obj-m := smm_loader.o
 #obj-m := smm_init_reloc.o
+obj-m := parser.o
 
 KDIR  := /home/micgor32/tmp/coreboot-24.12/payloads/external/LinuxBoot/build/kernel-6_12_11 # hardcoded path, remove later
 PWD   := $(shell pwd)
 
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	sh uroot.sh
 
 # all:
 # 	$(MAKE) -C $(KDIR) M=$(PWD) modules
@@ -23,12 +25,12 @@ default:
 #
 
 clean:
-	rm -f smm_*.mod
-	rm -f smm_*.mod.*
-	rm -f smm_*.ko
-	rm -f smm_*.o
-	rm -f module.order
-	rm -f Module.symver
+	rm -f parser*.mod
+	rm -f parser*.mod.*
+	rm -f parser*.ko
+	rm -f parser*.o
+	rm -f modules.order
+	rm -f Module.symvers
 help:
 	@echo "Available targets:"
 	@echo "  all          - Build all modules" 
