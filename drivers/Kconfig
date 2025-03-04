@@ -247,6 +247,4 @@ source "drivers/cdx/Kconfig"
 
 source "drivers/dpll/Kconfig"
 
-source "drivers/smm/Kconfig"
-
 endmenu

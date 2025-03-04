@@ -36,5 +36,6 @@ obj-y				+= psci/
 obj-y				+= qcom/
 obj-y				+= samsung/
 obj-y				+= smccc/
+obj-$(CONFIG_SMM_DRIVER)	+= smm/
 obj-y				+= tegra/
 obj-y				+= xilinx/
