@@ -20,99 +20,110 @@ static struct lb_pld_smram_descriptor_block *smm_info;
 
 static ssize_t smram_tag_out(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-    return scnprintf(buf, PAGE_SIZE, "0x%X\n", smm_info->tag);
+    return sysfs_emit(buf, "0x%X\n", smm_info->tag);
 }
 
 static ssize_t smram_size_out(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-    return scnprintf(buf, PAGE_SIZE, "0x%X\n", smm_info->size);
+    return sysfs_emit(buf, "0x%X\n", smm_info->size);
 }
 
 static ssize_t smram_nr_reg_out(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-    return scnprintf(buf, PAGE_SIZE, "%x\n", smm_info->number_of_smm_regions);
+    return sysfs_emit(buf, "%x\n", smm_info->number_of_smm_regions);
+}
+
+static ssize_t smram_subregions_size_out(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+    int i;
+    char local_buf[PAGE_SIZE];
+    ssize_t ret = 0;
+
+    for (i = 0; i < smm_info->number_of_smm_regions; i++){
+        ret += scnprintf(local_buf + ret, sizeof(local_buf) - ret,
+                    "0x%llx\n", smm_info->descriptor[i].physical_size);
+    }
+    return sysfs_emit(buf, "%s", local_buf);
+}
+
+static ssize_t smram_subregions_start_out(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+    int i;
+    char local_buf[PAGE_SIZE];
+    ssize_t ret = 0;
+
+    for (i = 0; i < smm_info->number_of_smm_regions; i++){
+        ret += scnprintf(local_buf + ret, sizeof(local_buf) - ret,
+                    "0x%llx\n", smm_info->descriptor[i].physical_start);
+    }
+    return sysfs_emit(buf, "%s", local_buf);
+}
+
+static ssize_t smram_subregions_state_out(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+    int i;
+    char local_buf[PAGE_SIZE];
+    ssize_t ret = 0;
+
+    for (i = 0; i < smm_info->number_of_smm_regions; i++){
+    ret += scnprintf(local_buf + ret, sizeof(local_buf) - ret,
+                    "0x%llx\n", smm_info->descriptor[i].region_state);
+    }
+    return sysfs_emit(buf, "%s", local_buf);
 }
 
 static struct kobj_attribute smm_info_tag_attribute = __ATTR(tag, 0400, smram_tag_out, NULL);
 static struct kobj_attribute smm_info_size_attribute = __ATTR(size, 0400, smram_size_out, NULL);
 static struct kobj_attribute smm_info_number_of_smm_regions_attribute = __ATTR(number_of_smm_regions, 0400, smram_nr_reg_out, NULL);
+static struct kobj_attribute smm_info_subregions_size_attribute = __ATTR(subregions_size, 0400, smram_subregions_size_out, NULL);
+static struct kobj_attribute smm_info_subregions_start_attribute = __ATTR(subregions_start, 0400, smram_subregions_start_out, NULL);
+static struct kobj_attribute smm_info_subregions_state_attribute = __ATTR(subregions_state, 0400, smram_subregions_state_out, NULL);
 
-static struct kobject *subregions_kobj;
+static struct attribute *attrs[] = {
+    &smm_info_tag_attribute.attr,
+    &smm_info_size_attribute.attr,
+    &smm_info_number_of_smm_regions_attribute.attr,
+    &smm_info_subregions_size_attribute.attr,
+    &smm_info_subregions_start_attribute.attr,
+    &smm_info_subregions_state_attribute.attr,
+    NULL,
+};
+
+static struct attribute_group attr_group = {
+    .attrs = attrs,
+};
+
+struct kobject *smm_info_kobj;
 
 static int smram_driver_probe(struct coreboot_device *dev)
 {
+    // the prints here are just for testing purposes, remove later
     pr_info("SMRAM info from cbtable");
 
     smm_info = &dev->smram_info;
 
     struct kobject *parent_kobj = kobject_get(firmware_kobj);
-	struct kobject *smm_kobj = kobject_create_and_add("smm", parent_kobj);
-	if (!smm_kobj) {
-	    pr_err("Failed to create kobj for smm\n");
-	    return -ENOMEM;
-	}
 
-    struct kobject *smm_info_kobj = kobject_create_and_add("smram", smm_kobj);
+    smm_info_kobj = kobject_create_and_add("smram", parent_kobj);
     if (!smm_info_kobj) {
         pr_err("Failed to create kobj for smram\n");
-        kobject_put(smm_kobj);
         return -ENOMEM;
     }
 
-    int ret = sysfs_create_file(smm_info_kobj, &smm_info_tag_attribute.attr);
-    ret |= sysfs_create_file(smm_info_kobj, &smm_info_size_attribute.attr);
-    ret |= sysfs_create_file(smm_info_kobj, &smm_info_number_of_smm_regions_attribute.attr);
+    int ret;
+    ret = sysfs_create_group(smm_info_kobj, &attr_group);
+
     if (ret) {
-        pr_err("Failed to create kobj for smram attrs\n");
         kobject_put(smm_info_kobj);
-        kobject_put(smm_kobj);
-        return ret;
     }
 
-    subregions_kobj = kobject_create_and_add("subregion", smm_info_kobj);
-    if (!subregions_kobj) {
-        pr_err("Failed to create subdir for subregions \n");
-        kobject_put(smm_info_kobj);
-        kobject_put(smm_kobj);
-        return -ENOMEM;
-    }
-
-    for (int i = 0; i < smm_info->number_of_smm_regions; i++) {
-        struct kobject *region_kobj;
-        char name[2]; // assuming there are no more than 99 subregions (which is not a case afaik)
-
-        scnprintf(name, sizeof(name), "%d", i);
-        region_kobj = kobject_create_and_add(name, subregions_kobj);
-        if (!region_kobj) {
-            pr_err("Failed to create region subdirectory for region %d\n", i);
-            kobject_put(subregions_kobj);
-            kobject_put(smm_info_kobj);
-            kobject_put(smm_kobj);
-            return -ENOMEM;
-        }
-
-        //ret = sysfs_create_file(region_kobj, &subregion_physical_start_attribute.attr);
-        //ret |= sysfs_create_file(region_kobj, &subregion_physical_size_attribute.attr);
-        //ret |= sysfs_create_file(region_kobj, &subregion_region_state_attribute.attr);
-        /*if (ret) {*/
-        /*    pr_err("Failed to create sysfs files for region %d\n", i);*/
-        /*    kobject_put(region_kobj);*/
-        /*    kobject_put(subregions_kobj);*/
-        /*    kobject_put(smm_info_kobj);*/
-        /*    kobject_put(smm_kobj);*/
-        /*    return -ENOMEM;    */
-        /*}*/
-    }
-
-    pr_info("sysfs entries for smmram created\n");
-
-    return 0;
+    pr_info("sysfs entries for SMRAM created\n");
+    return ret;
 }
 
 static void smram_driver_remove(struct coreboot_device *dev)
 {
-    pr_info("parser exit");
-    // perform clean up here
+    kobject_put(smm_info_kobj);
 }
 
 static const struct coreboot_device_id smm_info_ids[] = {
