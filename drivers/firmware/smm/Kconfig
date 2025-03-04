@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0
 
+if GOOGLE_FIRMWARE && GOOGLE_COREBOOT_TABLE
+
 config SMM_DRIVER
 	bool "SMM initialization (LinuxBootSMM)"
 	default n
-	depends on GOOGLE_FIRMWARE && 
-		   GOOGLE_COREBOOT_TABLE
 	help
 	  Enables driver for initializing System Management Mode (SMM).
-	  Only to be used when compiling as kernel for coreboot + LinuxBootSMM
-	  setup. If in doubt, say "N"
-	
-endmenu
+	  Only to be used when compiling as kernel for coreboot+LinuxBootSMM
+	  setup. If in doubt, say N.
+
+endif
