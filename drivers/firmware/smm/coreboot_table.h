@@ -7,6 +7,8 @@
  * Copyright 2014 Gerd Hoffmann <kraxel@redhat.com>
  * Copyright 2017 Google Inc.
  * Copyright 2017 Samuel Holland <samuel@sholland.org>
+ * Copyright 2025 9elements gmbh
+ * Copyright 2025 Michal Gorlas <michal.gorlas@9elements.com>
  */
 
 #ifndef __COREBOOT_TABLE_H
@@ -65,6 +67,42 @@ struct lb_pld_smram_descriptor_block {
 	struct lb_pld_smram_descriptor descriptor[1];
 };
 
+#define CB_TAG_PLD_SMM_REGISTER_INFO  0x50
+struct lb_pld_generic_register {
+	u8 register_id;
+	u8 address_space_id;
+	u8 register_bit_width;
+	u8 register_bit_offset;
+	u32 value;
+	u64 address;
+};
+
+struct lb_pld_smm_registers {
+	u32 tag;
+	u32 size;
+	u32 revision;
+	u32 count;
+	struct lb_pld_generic_register registers[];
+};
+
+#define LB_TAG_PLD_SPI_FLASH_INFO     0x52
+struct lb_pld_spi_flash_info {
+	u32 tag;
+	u32 size;
+	u16 revision;
+	u16 flags;
+	struct lb_pld_generic_register spi_address;
+};
+
+#define CB_TAG_PLD_S3_COMMUNICATION   0x54
+struct lb_pld_s3_communication {
+	u32 tag;
+	u32 size;
+	struct lb_pld_smram_descriptor comm_buffer;
+	u8 pld_acpi_s3_enable;
+	u8 pad[3];
+};
+
 /* Describes framebuffer setup by coreboot */
 struct lb_framebuffer {
 	u32 tag;
@@ -94,6 +132,9 @@ struct coreboot_device {
 		struct lb_cbmem_entry cbmem_entry;
 		struct lb_framebuffer framebuffer;
 		struct lb_pld_smram_descriptor_block smram_info;
+		struct lb_pld_smm_registers smm_registers;
+		struct lb_pld_spi_flash_info spi_info;
+		struct lb_pld_s3_communication s3_comm;
 		DECLARE_FLEX_ARRAY(u8, raw);
 	};
 };
