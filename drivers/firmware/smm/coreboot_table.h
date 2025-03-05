@@ -53,7 +53,7 @@ struct lb_cbmem_entry {
 	u32 id;
 };
 
-#define CB_TAG_PLD_SMM_SMRAM          0x51
+#define CB_TAG_PLD_SMM_SMRAM 0x51
 struct lb_pld_smram_descriptor {
 	u32 physical_start;
 	u32 physical_size;
@@ -67,7 +67,7 @@ struct lb_pld_smram_descriptor_block {
 	struct lb_pld_smram_descriptor descriptor[1];
 };
 
-#define CB_TAG_PLD_SMM_REGISTER_INFO  0x50
+#define CB_TAG_PLD_SMM_REGISTER_INFO 0x50
 struct lb_pld_generic_register {
 	u8 register_id;
 	u8 address_space_id;
@@ -85,7 +85,7 @@ struct lb_pld_smm_registers {
 	struct lb_pld_generic_register registers[];
 };
 
-#define LB_TAG_PLD_SPI_FLASH_INFO     0x52
+#define LB_TAG_PLD_SPI_FLASH_INFO 0x52
 struct lb_pld_spi_flash_info {
 	u32 tag;
 	u32 size;
@@ -94,7 +94,7 @@ struct lb_pld_spi_flash_info {
 	struct lb_pld_generic_register spi_address;
 };
 
-#define CB_TAG_PLD_S3_COMMUNICATION   0x54
+#define CB_TAG_PLD_S3_COMMUNICATION 0x54
 struct lb_pld_s3_communication {
 	u32 tag;
 	u32 size;
@@ -112,15 +112,15 @@ struct lb_framebuffer {
 	u32 x_resolution;
 	u32 y_resolution;
 	u32 bytes_per_line;
-	u8  bits_per_pixel;
-	u8  red_mask_pos;
-	u8  red_mask_size;
-	u8  green_mask_pos;
-	u8  green_mask_size;
-	u8  blue_mask_pos;
-	u8  blue_mask_size;
-	u8  reserved_mask_pos;
-	u8  reserved_mask_size;
+	u8 bits_per_pixel;
+	u8 red_mask_pos;
+	u8 red_mask_size;
+	u8 green_mask_pos;
+	u8 green_mask_size;
+	u8 blue_mask_pos;
+	u8 blue_mask_size;
+	u8 reserved_mask_pos;
+	u8 reserved_mask_size;
 };
 
 /* A device, additionally with information from coreboot. */
@@ -167,8 +167,8 @@ void coreboot_driver_unregister(struct coreboot_driver *driver);
  * boilerplate.  Each module may only use this macro once, and
  * calling it replaces module_init() and module_exit()
  */
-#define module_coreboot_driver(__coreboot_driver) \
+#define module_coreboot_driver(__coreboot_driver)                  \
 	module_driver(__coreboot_driver, coreboot_driver_register, \
-			coreboot_driver_unregister)
+		      coreboot_driver_unregister)
 
 #endif /* __COREBOOT_TABLE_H */
