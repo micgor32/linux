@@ -3,6 +3,7 @@ obj-y += smram.o
 obj-y += smm_registers.o
 obj-y += spi_info.o
 obj-y += s3_comm.o
+obj-y += smm_loader.o
 
 #obj-y += smm_loader.o commented out for now, uncomment for full build
 # This is for testing purposes
@@ -21,14 +22,14 @@ obj-y += s3_comm.o
 # 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 # 	#sh uroot.sh
 #
-# clean:
-# 	rm -f *.mod
-# 	rm -f *.mod.*
-# 	rm -f *.ko
-# 	rm -f *.o
-# 	rm -r .*
-# 	rm -f modules.order
-# 	rm -f Module.symvers
+clean:
+	rm -f *.mod
+	rm -f *.mod.*
+	rm -f *.ko
+	rm -f *.o
+	rm -r .*
+	rm -f modules.order
+	rm -f Module.symvers
 # help:
 # 	@echo "Available targets:"
 # 	@echo "  default      - Build all targets"
