@@ -55,9 +55,9 @@ struct lb_cbmem_entry {
 
 #define CB_TAG_PLD_SMM_SMRAM          0x51
 struct lb_pld_smram_descriptor {
-	u64 physical_start;
-	u64 physical_size;
-	u64 region_state;
+	u32 physical_start;
+	u32 physical_size;
+	u32 region_state;
 };
 
 struct lb_pld_smram_descriptor_block {
@@ -74,7 +74,7 @@ struct lb_pld_generic_register {
 	u8 register_bit_width;
 	u8 register_bit_offset;
 	u32 value;
-	u64 address;
+	u32 address;
 };
 
 struct lb_pld_smm_registers {
