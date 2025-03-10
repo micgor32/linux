@@ -17,6 +17,8 @@
 
 static struct lb_pld_spi_flash_info *spi_cbtable_info;
 struct spi_flash_info *spi_info;
+extern u64 lshift(u64, uint);
+extern u64 unpack_cbuint64(struct cbuint64);
 
 static int spi_info_driver_probe(struct coreboot_device *dev)
 {
@@ -37,7 +39,7 @@ static int spi_info_driver_probe(struct coreboot_device *dev)
 	spi_info->spi_address.register_bit_offset =
 		spi_cbtable_info->spi_address.register_bit_offset;
 	spi_info->spi_address.value = spi_cbtable_info->spi_address.value;
-	spi_info->spi_address.address = spi_cbtable_info->spi_address.address;
+	spi_info->spi_address.address = unpack_cbuint64(spi_cbtable_info->spi_address.address);
 
 	return 0;
 }

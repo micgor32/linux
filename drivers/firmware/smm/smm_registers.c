@@ -17,6 +17,8 @@
 
 static struct lb_pld_smm_registers *smm_regs_cbtable_info;
 struct smm_registers_info *smm_regs;
+extern u64 lshift(u64, uint);
+extern u64 unpack_cbuint64(struct cbuint64);
 
 static int smm_regs_driver_probe(struct coreboot_device *dev)
 {
@@ -50,7 +52,7 @@ static int smm_regs_driver_probe(struct coreboot_device *dev)
 		smm_regs->registers[i].value =
 			smm_regs_cbtable_info->registers[i].value;
 		smm_regs->registers[i].address =
-			smm_regs_cbtable_info->registers[i].address;
+			unpack_cbuint64(smm_regs_cbtable_info->registers[i].address);
 	}
 
 	return 0;

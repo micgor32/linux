@@ -17,6 +17,8 @@
 
 static struct lb_pld_s3_communication *s3_cbtable_info;
 struct s3_comm_info *s3_info;
+extern u64 lshift(u64, uint);
+extern u64 unpack_cbuint64(struct cbuint64);
 
 static int s3_communications_driver_probe(struct coreboot_device *dev)
 {
@@ -26,10 +28,10 @@ static int s3_communications_driver_probe(struct coreboot_device *dev)
 	}
 
 	s3_info = kmalloc(sizeof(struct s3_comm_info), GFP_KERNEL);
-	s3_info->physical_start = s3_cbtable_info->comm_buffer.physical_start;
+	s3_info->physical_start = unpack_cbuint64(s3_cbtable_info->comm_buffer.physical_start);
 	s3_info->pld_acpi_s3_enable = s3_cbtable_info->pld_acpi_s3_enable;
-	s3_info->physical_size = s3_cbtable_info->comm_buffer.physical_size;
-	s3_info->region_state = s3_cbtable_info->comm_buffer.region_state;
+	s3_info->physical_size = unpack_cbuint64(s3_cbtable_info->comm_buffer.physical_size);
+	s3_info->region_state = unpack_cbuint64(s3_cbtable_info->comm_buffer.region_state);
 
 	return 0;
 }
