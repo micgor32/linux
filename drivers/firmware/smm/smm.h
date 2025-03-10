@@ -11,13 +11,22 @@
 #ifndef __SMM_H
 #define __SMM_H
 
+#include <linux/cpu.h>
+
+#define SMM_DEFAULT_SMBASE 0x30000
+#define SMM_DEFAULT_SIZE   0x10000
+#define SMM_ENTRY_OFFSET 0x8000
+#define SMM_MINIMUM_STACK_SIZE 32
+
+u64 lshift(u64 opr, uint count);
+
 struct generic_register {
 	u8 register_id;
 	u8 address_space_id;
 	u8 register_bit_width;
 	u8 register_bit_offset;
 	u32 value;
-	u32 address;
+	u64 address;
 };
 
 struct smram_descriptor {
@@ -36,6 +45,7 @@ struct smm_registers_info {
 struct smram_info {
 	u32 nr_of_smm_regions;
 	struct smram_descriptor descriptor[1];
+	u32 stack_size;
 };
 
 struct spi_flash_info {
@@ -57,6 +67,7 @@ struct smm_state {
 	uintptr_t perm_smbase;
 	size_t perm_smsize;
 	size_t smm_save_state_size;
+	size_t nr_cnn_save_states;
 	// again, leave for now, append with needed stuff. What we have so far is for sure needed tho.
 };
 
@@ -66,6 +77,14 @@ struct smm_data {
 	struct spi_flash_info spi_flash_info;
 	struct s3_comm_info s3_info; // wont be used for now
 	int cpu_count;
+};
+
+struct stub_data {
+	u32 stack_size;
+	u32 stack_top;
+	// handler 
+	// cr3 if needed
+	u16 apic_
 };
 
 #endif

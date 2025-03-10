@@ -92,10 +92,45 @@ static struct smm_data get_cb_data(void)
 	return ret;
 }
 
+static int setup_stub(const uintptr_t smbase, const size_t smm_size, struct smm_state *params)
+{
+	// defince stub and its size 
+	
+	const uintptr_t stub_location = smbase + SMM_ENTRY_OFFSET;
+
+	/*struct stub_data stub_params;*/
+	/*stub_params->stack_top = stack_top;*/
+	/*stub_params->stack_size = g_stack_size;*/
+	/*stub_params->c_handler = (uintptr_t)params->handler;*/
+	/**/
+	/*/* This runs on the BSP. All the APs are its siblings */
+	/*struct cpu_info *info = cpu_info();*/
+	/*if (!info || !info->cpu) {*/
+	/*	printk(BIOS_ERR, "%s: Failed to find BSP struct device\n", __func__);*/
+	/*	return -1;*/
+	/*}*/
+	/*int i = 0;*/
+	/*for (struct device *dev = info->cpu; dev; dev = dev->sibling)*/
+	/*	if (dev->enabled)*/
+	/*		stub_params->apic_id_to_cpu[i++] = dev->path.apic.initial_lapicid;*/
+	/**/
+	/*if (i != params->num_cpus) {*/
+	/*	printk(BIOS_ERR, "%s: Failed to set up apic map correctly\n", __func__);*/
+	/*	return -1;*/
+	/*}*/
+	return 0;
+}
+
 static int setup_reloc_handler(struct smm_state *params)
 {
-	// place holder
-	return 0;
+	uintptr_t smbase = SMM_DEFAULT_SMBASE;
+	if (params->nr_cnn_save_states > 1)
+		return -1;
+
+	/*if (params->handler == NULL)*/
+	/*	return -1;*/
+
+	return setup_stub(smbase, SMM_DEFAULT_SIZE, params);
 }
 
 static int setup_perm_handler(struct smm_state *params)
@@ -110,6 +145,7 @@ static int load_reloc_handler(struct smm_data *data) // left for reference from 
 	struct smm_state params = {
 		.cpu_count = data->cpu_count,
 		.smm_save_state_size = 0,
+		.nr_cnn_save_states = 1,
 	};
 
 	if (setup_reloc_handler(&params)) {
@@ -128,6 +164,7 @@ static int load_permanent_handler(struct smm_data *data) //left for reference sf
 		.perm_smbase = data->smram.descriptor[0].physical_start,
 		.perm_smsize = data->smram.descriptor[0].physical_size,
 		.smm_save_state_size = 0,
+		.nr_cnn_save_states = (size_t)data->cpu_count,
 	};
 
 	if (setup_perm_handler(&params)) {
@@ -136,6 +173,37 @@ static int load_permanent_handler(struct smm_data *data) //left for reference sf
 	}
 
 	return 0; 
+}
+
+static uintptr_t stack_top;
+static size_t global_stack_size;
+//static size_t perm_smram_size; // this var will be assigned the value that the smm interface assigns in cb, effectively making the if statement below unnecessary.
+
+static int setup_stack(struct smm_data *data)
+{
+	size_t stack_size = (size_t)data->smram.stack_size;
+	if (stack_size <= SMM_MINIMUM_STACK_SIZE || (stack_size & 3) != 0) {
+		printk(KERN_ERR "too small stack size");
+		return 1;
+	}
+
+	const size_t total_stack_size = data->cpu_count * stack_size;
+	printk(KERN_INFO "total_stack_size is 0x%zx", total_stack_size);
+	/* see later this check
+	 * if (total_stack_size >= perm_smram_size) {*/
+	/*	printk(BIOS_ERR, "%s: Stack won't fit smram\n", __func__);*/
+	/*	return -1;*/
+	/*}*/
+	
+	stack_top = data->smram.descriptor[0].physical_start + total_stack_size;
+	global_stack_size = stack_size;
+	return 0;
+
+}
+
+static int reloc_map(const uintptr_t smbase, const uint nr_cpus, const struct smm_data *params)
+{
+	return 0;
 }
 
 static int __init smm_loader_init(void)
@@ -148,15 +216,23 @@ static int __init smm_loader_init(void)
 		// for now we will just print out the state value, idk what is the meaning of particular ones, i.e. which value means region is locked or not
 		printk(KERN_INFO "state 0x%llx", cb_data.smram.descriptor[i].region_state);
 	}
+	printk(KERN_INFO "TEST");
 
-	// load the handlers
-	if (load_permanent_handler(&cb_data)) {
-		printk(KERN_ERR "loading permanent handler didnt worked");
-		return 1;
+	if (setup_stack(&cb_data)) {
+		printk(KERN_ERR "setting up stack failed");
+		return -1;
 	}
 
 	if (load_reloc_handler(&cb_data)) {
 		printk(KERN_ERR "loading reloc handler didnt worked");	
+		return -1;
+	}
+
+
+	// load the handlers
+	if (load_permanent_handler(&cb_data)) {
+		printk(KERN_ERR "loading permanent handler didnt worked");
+		return -1;
 	}
 
 	return 0;
@@ -166,9 +242,8 @@ static void __exit smm_loader_exit(void)
 {
 	// placeholder for now
 	printk(KERN_INFO "SMM initialized");
-	/*kfree(smram);*/
-	/*kfree(smm_regs);*/
-	/*kfree(spi_info);*/
+	// no need for a "big" cleanup, the critical parts of memory was already freed in get_cb_data(), we have no deadlock here - proof: try executing as out-of-tree, rmmod should go without issues
+	// meaning the remaining "parser" modules may be removed and do not create cross-dependenceis with this loader.
 }
 
 module_init(smm_loader_init);

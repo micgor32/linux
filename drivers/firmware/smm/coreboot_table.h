@@ -17,6 +17,11 @@
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
 
+struct cbuint64 {
+	u32 lo;
+	u32 hi;
+};
+
 /* Coreboot table header structure */
 struct coreboot_table_header {
 	char signature[4];
@@ -55,15 +60,16 @@ struct lb_cbmem_entry {
 
 #define CB_TAG_PLD_SMM_SMRAM 0x51
 struct lb_pld_smram_descriptor {
-	u64 physical_start;
-	u64 physical_size;
-	u64 region_state;
+	struct cbuint64 physical_start;
+	struct cbuint64 physical_size;
+	struct cbuint64 region_state;
 };
 
 struct lb_pld_smram_descriptor_block {
 	u32 tag;
 	u32 size;
 	u32 number_of_smm_regions;
+	u32 stack_size;
 	struct lb_pld_smram_descriptor descriptor[1];
 };
 
@@ -74,7 +80,7 @@ struct lb_pld_generic_register {
 	u8 register_bit_width;
 	u8 register_bit_offset;
 	u32 value;
-	u32 address;
+	struct cbuint64 address;
 };
 
 struct lb_pld_smm_registers {

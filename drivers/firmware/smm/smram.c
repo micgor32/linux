@@ -18,6 +18,21 @@
 static struct lb_pld_smram_descriptor_block *smram_cbtable_info;
 struct smram_info *smram;
 
+u64 lshift(u64 opr, uint count)
+{
+	BUG_ON(count > 63); // Not needed as long as we keep count a constant in all calls. Just in case though (future uses?).
+	return opr << count;
+}
+
+EXPORT_SYMBOL(lshift);
+
+u64 unpack_cbuint64(struct cbuint64 inp)
+{
+	return lshift(inp.hi, 32) | inp.lo;
+}
+
+EXPORT_SYMBOL(unpack_cbuint64);
+
 static int smram_driver_probe(struct coreboot_device *dev)
 {
 	smram_cbtable_info = &dev->smram_info;
@@ -38,17 +53,23 @@ static int smram_driver_probe(struct coreboot_device *dev)
 		kfree(smram);
 		return -ENXIO;
 	}
-
+	smram->stack_size = smram_cbtable_info->stack_size;
+	printk(KERN_INFO "smram module");
+	printk(KERN_INFO "stack size 0x%x", smram->stack_size);
 	for (int i = 0; i < smram->nr_of_smm_regions; i++) {
 		smram->descriptor[i].physical_start =
-			smram_cbtable_info->descriptor[i].physical_start;
+			unpack_cbuint64(smram_cbtable_info->descriptor[i].physical_start);
+		printk(KERN_INFO "start 0x%llx", smram->descriptor[i].physical_start);
 		smram->descriptor[i].cpu_start =
-			smram_cbtable_info->descriptor[i].physical_start;
+			unpack_cbuint64(smram_cbtable_info->descriptor[i].physical_start);
 		smram->descriptor[i].physical_size =
-			smram_cbtable_info->descriptor[i].physical_size;
+			unpack_cbuint64(smram_cbtable_info->descriptor[i].physical_size);
+		printk(KERN_INFO "size 0x%llx", smram->descriptor[i].physical_size);
 		smram->descriptor[i].region_state =
-			smram_cbtable_info->descriptor[i].region_state;
+			unpack_cbuint64(smram_cbtable_info->descriptor[i].region_state);
+		printk(KERN_INFO "state 0x%llx", smram->descriptor[i].region_state);
 	}
+	printk(KERN_INFO "end smram mod");
 
 	return 0;
 }
