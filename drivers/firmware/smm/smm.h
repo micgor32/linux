@@ -21,10 +21,10 @@ struct generic_register {
 };
 
 struct smram_descriptor {
-	u32 physical_start;
-	u32 physical_size;
-	u32 cpu_start;
-	u32 region_state;
+	u64 physical_start;
+	u64 physical_size;
+	u64 cpu_start;
+	u64 region_state;
 };
 
 struct smm_registers_info {
@@ -45,10 +45,27 @@ struct spi_flash_info {
 };
 
 struct s3_comm_info {
-	u32 physical_start;
-	u32 physical_size;
-	u32 region_state;
+	u64 physical_start;
+	u64 physical_size;
+	u64 region_state;
 	u8 pld_acpi_s3_enable;
+};
+
+
+struct smm_state {
+	int cpu_count;
+	uintptr_t perm_smbase;
+	size_t perm_smsize;
+	size_t smm_save_state_size;
+	// again, leave for now, append with needed stuff. What we have so far is for sure needed tho.
+};
+
+struct smm_data {
+	struct smram_info smram;
+	struct smm_registers_info registers;
+	struct spi_flash_info spi_flash_info;
+	struct s3_comm_info s3_info; // wont be used for now
+	int cpu_count;
 };
 
 #endif
