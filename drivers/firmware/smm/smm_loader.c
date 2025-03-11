@@ -139,7 +139,6 @@ static int setup_perm_handler(struct smm_state *params)
 	return 0;
 }
 
-/* Will install the relocation handler */
 static int load_reloc_handler(struct smm_data *data) // left for reference from cb declaration (int nr_cpus, size_t save_state_size)
 {
 	struct smm_state params = {
@@ -156,14 +155,13 @@ static int load_reloc_handler(struct smm_data *data) // left for reference from 
 	return 0;
 }
 
-/* Will install the permantent handler */
 static int load_permanent_handler(struct smm_data *data) //left for reference sform cb declaration (int nr_cpus , size_t save_state_size, uintptr_t smbase, size_t smram_size)
 {
 	struct smm_state params = {
 		.cpu_count = data->cpu_count,
-		.perm_smbase = data->smram.descriptor[0].physical_start,
-		.perm_smsize = data->smram.descriptor[0].physical_size,
-		.smm_save_state_size = 0,
+		.perm_smbase = data->smram.perm_smbase,
+		.perm_smsize = data->smram.perm_smsize,
+		.smm_save_state_size = data->smram.smm_save_state_size,
 		.nr_cnn_save_states = (size_t)data->cpu_count,
 	};
 
@@ -177,23 +175,21 @@ static int load_permanent_handler(struct smm_data *data) //left for reference sf
 
 static uintptr_t stack_top;
 static size_t global_stack_size;
-//static size_t perm_smram_size; // this var will be assigned the value that the smm interface assigns in cb, effectively making the if statement below unnecessary.
 
 static int setup_stack(struct smm_data *data)
 {
 	size_t stack_size = (size_t)data->smram.stack_size;
 	if (stack_size <= SMM_MINIMUM_STACK_SIZE || (stack_size & 3) != 0) {
 		printk(KERN_ERR "too small stack size");
-		return 1;
+		return -1;
 	}
 
 	const size_t total_stack_size = data->cpu_count * stack_size;
 	printk(KERN_INFO "total_stack_size is 0x%zx", total_stack_size);
-	/* see later this check
-	 * if (total_stack_size >= perm_smram_size) {*/
-	/*	printk(BIOS_ERR, "%s: Stack won't fit smram\n", __func__);*/
-	/*	return -1;*/
-	/*}*/
+	if (total_stack_size >= data->smram.perm_smsize) {
+		printk(KERN_ERR, "%s: Stack won't fit smram\n", __func__);
+		return -1;
+	}
 	
 	stack_top = data->smram.descriptor[0].physical_start + total_stack_size;
 	global_stack_size = stack_size;
@@ -216,7 +212,6 @@ static int __init smm_loader_init(void)
 		// for now we will just print out the state value, idk what is the meaning of particular ones, i.e. which value means region is locked or not
 		printk(KERN_INFO "state 0x%llx", cb_data.smram.descriptor[i].region_state);
 	}
-	printk(KERN_INFO "TEST");
 
 	if (setup_stack(&cb_data)) {
 		printk(KERN_ERR "setting up stack failed");

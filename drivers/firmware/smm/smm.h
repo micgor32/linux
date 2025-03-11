@@ -46,6 +46,9 @@ struct smram_info {
 	u32 nr_of_smm_regions;
 	struct smram_descriptor descriptor[1];
 	u32 stack_size;
+	u64 perm_smsize; 
+	u32 perm_smbase;
+	u64 smm_save_state_size;
 };
 
 struct spi_flash_info {
@@ -84,7 +87,7 @@ struct stub_data {
 	u32 stack_top;
 	// handler 
 	// cr3 if needed
-	u16 apic_
+	u16 apic;
 };
 
 #endif
