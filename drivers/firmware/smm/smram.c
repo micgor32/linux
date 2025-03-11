@@ -54,20 +54,25 @@ static int smram_driver_probe(struct coreboot_device *dev)
 		return -ENXIO;
 	}
 	smram->stack_size = smram_cbtable_info->stack_size;
+	smram->perm_smsize = unpack_cbuint64(smram_cbtable_info->perm_smsize);
+	smram->perm_smbase = smram_cbtable_info->perm_smbase;
+	smram->smm_save_state_size = unpack_cbuint64(smram_cbtable_info->smm_save_state_size);
+	// delete from here (just for testing)
 	printk(KERN_INFO "smram module");
 	printk(KERN_INFO "stack size 0x%x", smram->stack_size);
+	printk(KERN_INFO "smsize 0x%llx", smram->perm_smsize);
+	printk(KERN_INFO "smbase 0x%x", smram->perm_smbase);
+	printk(KERN_INFO "save state size 0x%llx", smram->smm_save_state_size);
+	// till here
 	for (int i = 0; i < smram->nr_of_smm_regions; i++) {
 		smram->descriptor[i].physical_start =
 			unpack_cbuint64(smram_cbtable_info->descriptor[i].physical_start);
-		printk(KERN_INFO "start 0x%llx", smram->descriptor[i].physical_start);
 		smram->descriptor[i].cpu_start =
 			unpack_cbuint64(smram_cbtable_info->descriptor[i].physical_start);
 		smram->descriptor[i].physical_size =
 			unpack_cbuint64(smram_cbtable_info->descriptor[i].physical_size);
-		printk(KERN_INFO "size 0x%llx", smram->descriptor[i].physical_size);
 		smram->descriptor[i].region_state =
 			unpack_cbuint64(smram_cbtable_info->descriptor[i].region_state);
-		printk(KERN_INFO "state 0x%llx", smram->descriptor[i].region_state);
 	}
 	printk(KERN_INFO "end smram mod");
 
