@@ -11,6 +11,9 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
+#include <asm/apic.h>
+#include <linux/spinlock.h>
+#include <linux/smp.h>
 
 #include "smm.h"
 
@@ -92,33 +95,75 @@ static struct smm_data get_cb_data(void)
 	return ret;
 }
 
+static uintptr_t stack_top;
+static size_t global_stack_size;
+
+static int setup_stack(struct smm_data *data)
+{
+	size_t stack_size = (size_t)data->smram.stack_size;
+	if (stack_size <= SMM_MINIMUM_STACK_SIZE || (stack_size & 3) != 0) {
+		printk(KERN_ERR "too small stack size");
+		return -1;
+	}
+
+	const size_t total_stack_size = data->cpu_count * stack_size;
+	printk(KERN_INFO "total_stack_size is 0x%zx", total_stack_size);
+	if (total_stack_size >= data->smram.perm_smsize) {
+		printk(KERN_ERR, "%s: Stack won't fit smram\n", __func__);
+		return -1;
+	}
+	
+	stack_top = data->smram.descriptor[0].physical_start + total_stack_size;
+	global_stack_size = stack_size;
+	return 0;
+
+}
+
+static asmlinkage void do_reloc(void *arg)
+{
+	// nothing for now
+}
+
+struct stub_data *stub_params;
 static int setup_stub(const uintptr_t smbase, const size_t smm_size, struct smm_state *params)
 {
 	// defince stub and its size 
 	
 	const uintptr_t stub_location = smbase + SMM_ENTRY_OFFSET;
 
-	/*struct stub_data stub_params;*/
-	/*stub_params->stack_top = stack_top;*/
-	/*stub_params->stack_size = g_stack_size;*/
-	/*stub_params->c_handler = (uintptr_t)params->handler;*/
-	/**/
-	/*/* This runs on the BSP. All the APs are its siblings */
-	/*struct cpu_info *info = cpu_info();*/
-	/*if (!info || !info->cpu) {*/
-	/*	printk(BIOS_ERR, "%s: Failed to find BSP struct device\n", __func__);*/
-	/*	return -1;*/
-	/*}*/
-	/*int i = 0;*/
-	/*for (struct device *dev = info->cpu; dev; dev = dev->sibling)*/
-	/*	if (dev->enabled)*/
-	/*		stub_params->apic_id_to_cpu[i++] = dev->path.apic.initial_lapicid;*/
-	/**/
-	/*if (i != params->num_cpus) {*/
-	/*	printk(BIOS_ERR, "%s: Failed to set up apic map correctly\n", __func__);*/
-	/*	return -1;*/
-	/*}*/
+	stub_params = kmalloc(sizeof(*stub_params), GFP_KERNEL);
+	stub_params->stack_top = stack_top;
+	stub_params->stack_size = global_stack_size;
+	stub_params->c_handler = (uintptr_t)do_reloc; // pass that info together with state for later, will make my life easier when dealing with permanent handler
+	stub_params->cr3 = params->cr3;
+
+	int i;
+
+	for_each_online_cpu(i) {
+		stub_params->apic[i] = per_cpu(x86_cpu_to_apicid, i);
+		//printk(KERN_INFO "cpu %d, apic id %d", i, stub_params->apic[i]);
+	}
+
+	if (i != params->cpu_count) {
+		printk(KERN_ERR "Failed to set up APIC map\n");
+		return -1;
+	}
+	
 	return 0;
+}
+
+static DEFINE_SPINLOCK(reloc_lock);
+
+static void initiate_relocation(void)
+{
+	unsigned long flags;
+
+	printk(KERN_INFO "obtaining lock before sending SMI");
+	spin_lock_irqsave(&reloc_lock, flags);
+	__apic_send_IPI_self(LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	spin_unlock_irqrestore(&reloc_lock, flags);
+	printk(KERN_INFO "lock released");
+	kfree(stub_params);
 }
 
 static int setup_reloc_handler(struct smm_state *params)
@@ -143,8 +188,11 @@ static int load_reloc_handler(struct smm_data *data) // left for reference from 
 {
 	struct smm_state params = {
 		.cpu_count = data->cpu_count,
-		.smm_save_state_size = 0,
+		.perm_smbase = data->smram.perm_smbase,
+		.perm_smsize = data->smram.perm_smsize,
+		.smm_save_state_size = data->smram.smm_save_state_size,
 		.nr_cnn_save_states = 1,
+		.cr3 = data->smram.cr3,
 	};
 
 	if (setup_reloc_handler(&params)) {
@@ -173,29 +221,7 @@ static int load_permanent_handler(struct smm_data *data) //left for reference sf
 	return 0; 
 }
 
-static uintptr_t stack_top;
-static size_t global_stack_size;
 
-static int setup_stack(struct smm_data *data)
-{
-	size_t stack_size = (size_t)data->smram.stack_size;
-	if (stack_size <= SMM_MINIMUM_STACK_SIZE || (stack_size & 3) != 0) {
-		printk(KERN_ERR "too small stack size");
-		return -1;
-	}
-
-	const size_t total_stack_size = data->cpu_count * stack_size;
-	printk(KERN_INFO "total_stack_size is 0x%zx", total_stack_size);
-	if (total_stack_size >= data->smram.perm_smsize) {
-		printk(KERN_ERR, "%s: Stack won't fit smram\n", __func__);
-		return -1;
-	}
-	
-	stack_top = data->smram.descriptor[0].physical_start + total_stack_size;
-	global_stack_size = stack_size;
-	return 0;
-
-}
 
 static int reloc_map(const uintptr_t smbase, const uint nr_cpus, const struct smm_data *params)
 {
@@ -229,6 +255,9 @@ static int __init smm_loader_init(void)
 		printk(KERN_ERR "loading permanent handler didnt worked");
 		return -1;
 	}
+
+	// for testing, lets see what happens
+	initiate_relocation();
 
 	return 0;
 }
