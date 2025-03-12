@@ -18,6 +18,10 @@
 #define SMM_ENTRY_OFFSET 0x8000
 #define SMM_MINIMUM_STACK_SIZE 32
 
+#define	LAPIC_INT_ASSERT 0x04000
+#define	LAPIC_DM_SMI 0x00200
+
+
 u64 lshift(u64 opr, uint count);
 
 struct generic_register {
@@ -49,6 +53,7 @@ struct smram_info {
 	u64 perm_smsize; 
 	u32 perm_smbase;
 	u64 smm_save_state_size;
+	u32 cr3;
 };
 
 struct spi_flash_info {
@@ -71,7 +76,7 @@ struct smm_state {
 	size_t perm_smsize;
 	size_t smm_save_state_size;
 	size_t nr_cnn_save_states;
-	// again, leave for now, append with needed stuff. What we have so far is for sure needed tho.
+	u32 cr3;
 };
 
 struct smm_data {
@@ -85,9 +90,9 @@ struct smm_data {
 struct stub_data {
 	u32 stack_size;
 	u32 stack_top;
-	// handler 
-	// cr3 if needed
-	u16 apic;
-};
+	u32 c_handler; 
+	u32 cr3;
+	u16 apic[CONFIG_NR_CPUS]; // Medicore approach. It assumes the person builing the kernel wont put bigger number than they need, otherwise we just waste space.
+} __packed;
 
 #endif
