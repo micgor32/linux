@@ -54,6 +54,7 @@ struct smram_info {
 	u32 perm_smbase;
 	u64 smm_save_state_size;
 	u32 cr3;
+
 };
 
 struct spi_flash_info {
@@ -92,7 +93,7 @@ struct stub_data {
 	u32 stack_top;
 	u32 c_handler; 
 	u32 cr3;
-	u16 apic[CONFIG_NR_CPUS]; // Medicore approach. It assumes the person builing the kernel wont put bigger number than they need, otherwise we just waste space.
+	u16 apic_to_cpu_num[CONFIG_NR_CPUS]; // Medicore approach. It assumes the person builing the kernel wont put bigger number than they need, otherwise we just waste space.
 } __packed;
 
 #endif
