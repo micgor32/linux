@@ -83,7 +83,7 @@ static struct smm_data get_cb_data(void)
 	printk(KERN_INFO "state 0x%llx\n", s3_info->region_state);
 	printk(KERN_INFO "acpi s3 enabled %d\n", s3_info->pld_acpi_s3_enable);
 
-	printk(KERN_INFO "cpu count: %d", cpu_count);
+	printk(KERN_INFO "cpu count: %d\n", cpu_count);
 	// end of statements to be cleaned up
 
 	// freeing the memory (also temp for now, see whether it makes sense here).
@@ -102,14 +102,14 @@ static int setup_stack(struct smm_data *data)
 {
 	size_t stack_size = (size_t)data->smram.stack_size;
 	if (stack_size <= SMM_MINIMUM_STACK_SIZE || (stack_size & 3) != 0) {
-		printk(KERN_ERR "too small stack size");
+		printk(KERN_ERR "too small stack size\n");
 		return -1;
 	}
 
 	const size_t total_stack_size = data->cpu_count * stack_size;
 	printk(KERN_INFO "total_stack_size is 0x%zx", total_stack_size);
 	if (total_stack_size >= data->smram.perm_smsize) {
-		printk(KERN_ERR, "%s: Stack won't fit smram\n", __func__);
+		printk(KERN_ERR "%s: Stack won't fit smram\n", __func__);
 		return -1;
 	}
 	
@@ -122,14 +122,48 @@ static int setup_stack(struct smm_data *data)
 static asmlinkage void do_reloc(void *arg)
 {
 	// nothing for now
+	printk(KERN_INFO "we are in SMM (lets get the hell out of here asap)\n");
 }
 
-struct stub_data *stub_params;
-static int setup_stub(const uintptr_t smbase, const size_t smm_size, struct smm_state *params)
+/*static int load_initial_stub(uintptr_t loc, void *start)*/
+/*{*/
+/*	// again, placeholder*/
+/*	printk(KERN_INFO "address 0x%02hh\n", start);*/
+/*	// once we have */
+/*	return 0;*/
+/*}*/
+
+static struct stub_data *stub_params;
+extern uint8_t smm_relocation_start;
+extern uint8_t smm_relocation_end;
+
+static int load_trampoline(struct stub_data *params, uintptr_t location)
 {
-	// defince stub and its size 
+	printk(KERN_INFO "location where stub will be placed 0x%x", location);
+	void __iomem *addr = ioremap((resource_size_t)location, &smm_relocation_end - &smm_relocation_start);
+	if (!addr) {
+		printk(KERN_ERR "Failed to ioremap the target address\n");
+		return -ENOMEM;
+	}
 	
+	// debug prints remove
+	printk(KERN_INFO "virt 0x%lx\n", addr);
+	printk(KERN_INFO "src 0x%lx\n", &smm_relocation_start);
+	// ...till here	
+
+	memcpy_toio(addr, &smm_relocation_start, 
+			&smm_relocation_end - &smm_relocation_start);
+	wbinvd();
+	return 0;
+}
+
+static int setup_stub_params(const uintptr_t smbase, const size_t smm_size, struct smm_state *params)
+{
 	const uintptr_t stub_location = smbase + SMM_ENTRY_OFFSET;
+	/*if(load_initial_stub(stub_location, &params->smmstub_start)) {*/
+	/*	printk(KERN_ERR "fialed to load initial stub\n");*/
+	/*	return -1;*/
+	/*}*/
 
 	stub_params = kmalloc(sizeof(*stub_params), GFP_KERNEL);
 	stub_params->stack_top = stack_top;
@@ -140,14 +174,17 @@ static int setup_stub(const uintptr_t smbase, const size_t smm_size, struct smm_
 	int i;
 
 	for_each_online_cpu(i) {
-		stub_params->apic[i] = per_cpu(x86_cpu_to_apicid, i);
-		//printk(KERN_INFO "cpu %d, apic id %d", i, stub_params->apic[i]);
+		stub_params->apic_to_cpu_num[i] = per_cpu(x86_cpu_to_apicid, i);
+		printk(KERN_INFO "cpu %d, apic id %d", i, stub_params->apic_to_cpu_num[i]);
 	}
 
 	if (i != params->cpu_count) {
 		printk(KERN_ERR "Failed to set up APIC map\n");
 		return -1;
 	}
+
+	if(load_trampoline(stub_params, stub_location))
+		return 1;
 	
 	return 0;
 }
@@ -156,14 +193,16 @@ static DEFINE_SPINLOCK(reloc_lock);
 
 static void initiate_relocation(void)
 {
-	unsigned long flags;
+	int i = 1000;
+	const bool x2apic = boot_cpu_has(X86_FEATURE_X2APIC);
 
-	printk(KERN_INFO "obtaining lock before sending SMI");
-	spin_lock_irqsave(&reloc_lock, flags);
-	__apic_send_IPI_self(LAPIC_INT_ASSERT | LAPIC_DM_SMI);
-	spin_unlock_irqrestore(&reloc_lock, flags);
-	printk(KERN_INFO "lock released");
-	kfree(stub_params);
+	apic->send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+
+	while (x2apic && i--) {
+		cpu_relax();
+	}
+
+	//kfree(stub_params);
 }
 
 static int setup_reloc_handler(struct smm_state *params)
@@ -175,7 +214,7 @@ static int setup_reloc_handler(struct smm_state *params)
 	/*if (params->handler == NULL)*/
 	/*	return -1;*/
 
-	return setup_stub(smbase, SMM_DEFAULT_SIZE, params);
+	return setup_stub_params(smbase, SMM_DEFAULT_SIZE, params);
 }
 
 static int setup_perm_handler(struct smm_state *params)
@@ -256,8 +295,15 @@ static int __init smm_loader_init(void)
 		return -1;
 	}
 
-	// for testing, lets see what happens
 	initiate_relocation();
+	// for testing, lets see what happens
+	/*unsigned long flags;*/
+	/**/
+	/*printk(KERN_INFO "obtaining lock before sending SMI");*/
+	/*spin_lock_irqsave(&reloc_lock, flags);*/
+	/*initiate_relocation();*/
+	/*spin_unlock_irqrestore(&reloc_lock, flags);*/
+	/*printk(KERN_INFO "lock released");*/
 
 	return 0;
 }

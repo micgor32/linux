@@ -20,7 +20,7 @@ struct smram_info *smram;
 
 u64 lshift(u64 opr, uint count)
 {
-	BUG_ON(count > 63); // Not needed as long as we keep count a constant in all calls. Just in case though (future uses?).
+	WARN_ON(count > 63); // Not needed as long as we keep count a constant in all calls. Just in case though (future uses?).
 	return opr << count;
 }
 
