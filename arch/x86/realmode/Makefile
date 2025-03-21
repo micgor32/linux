@@ -15,8 +15,13 @@ subdir- := rm
 
 obj-y += init.o
 obj-y += rmpiggy.o
+obj-y += test.o
+obj-y += smm_setup.o
 
-$(obj)/rmpiggy.o: $(obj)/rm/realmode.bin
+$(obj)/rmpiggy.o: $(obj)/rm/realmode.bin $(obj)/rm/smmstub.bin
 
 $(obj)/rm/realmode.bin: FORCE
+	$(Q)$(MAKE) $(build)=$(obj)/rm $@
+
+$(obj)/rm/smmstub.bin: FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/rm $@

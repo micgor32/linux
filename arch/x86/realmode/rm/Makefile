@@ -7,7 +7,7 @@
 #
 #
 
-always-y := realmode.bin realmode.relocs
+always-y := realmode.bin realmode.relocs smmstub.bin smmstub.relocs
 
 wakeup-objs	:= wakeup_asm.o wakemain.o video-mode.o
 wakeup-objs	+= copy.o bioscall.o regs.o
@@ -23,11 +23,23 @@ realmode-y			+= header.o
 realmode-y			+= trampoline_$(BITS).o
 realmode-y			+= stack.o
 realmode-y			+= reboot.o
+#realmode-y			+= teststub.o
+#realmode-y			+= smmhandler.o
 realmode-$(CONFIG_ACPI_SLEEP)	+= $(wakeup-objs)
+
+smmstub-y			+= stub_header.o
+smmstub-y			+= stub.o
+smmstub-y			+= stack.o
+# only add it for testing, we do not need reboot here
+smmstub-y			+= reboot.o
 
 targets	+= $(realmode-y)
 
+targets += $(smmstub-y)
+
 REALMODE_OBJS = $(addprefix $(obj)/,$(realmode-y))
+# see whether we need separate objs, again I dont think so
+STUB_OBJS = $(addprefix $(obj)/,$(smmstub-y))
 
 sed-pasyms := -n -r -e 's/^([0-9a-fA-F]+) [ABCDGRSTVW] (.+)$$/pa_\2 = \2;/p'
 
@@ -37,21 +49,40 @@ quiet_cmd_pasyms = PASYMS  $@
 targets += pasyms.h
 $(obj)/pasyms.h: $(REALMODE_OBJS) FORCE
 	$(call if_changed,pasyms)
+	
+targets += pasyms_smm.h
+$(obj)/pasyms_smm.h: $(STUB_OBJS) FORCE
+	$(call if_changed,pasyms)
 
 targets += realmode.lds
 $(obj)/realmode.lds: $(obj)/pasyms.h
 
+targets += smmstub.lds
+$(obj)/smmstub.lds: $(obj)/pasyms_smm.h
+
 LDFLAGS_realmode.elf := -m elf_i386 --emit-relocs -T
 CPPFLAGS_realmode.lds += -P -C -I$(objtree)/$(obj)
+
+LDFLAGS_smmstub.elf := -m elf_i386 --emit-relocs -T
+CPPFLAGS_smmstub.lds += -P -C -I$(objtree)/$(obj)
 
 targets += realmode.elf
 $(obj)/realmode.elf: $(obj)/realmode.lds $(REALMODE_OBJS) FORCE
 	$(call if_changed,ld)
 
+targets += smmstub.elf
+$(obj)/smmstub.elf: $(obj)/smmstub.lds $(STUB_OBJS) FORCE
+	$(call if_changed,ld)
+
 OBJCOPYFLAGS_realmode.bin := -O binary
+OBJCOPYFLAGS_smmstub.bin  := -O binary
 
 targets += realmode.bin
 $(obj)/realmode.bin: $(obj)/realmode.elf $(obj)/realmode.relocs FORCE
+	$(call if_changed,objcopy)
+
+targets += smmstub.bin
+$(obj)/smmstub.bin: $(obj)/smmstub.elf $(obj)/smmstub.relocs FORCE
 	$(call if_changed,objcopy)
 
 quiet_cmd_relocs = RELOCS  $@
@@ -59,6 +90,10 @@ quiet_cmd_relocs = RELOCS  $@
 
 targets += realmode.relocs
 $(obj)/realmode.relocs: $(obj)/realmode.elf FORCE
+	$(call if_changed,relocs)
+
+targets += smmstub.relocs
+$(obj)/smmstub.relocs: $(obj)/smmstub.elf FORCE
 	$(call if_changed,relocs)
 
 # ---------------------------------------------------------------------------

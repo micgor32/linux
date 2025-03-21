@@ -40,6 +40,33 @@ struct real_mode_header {
 #endif
 };
 
+// FIXME: for all SMM stub related structures and vars, bound it with config
+/* This must match data at realmode/rm/stub_header.S */
+struct stub_header {
+	u32	text_start;
+	u32	ro_end;
+	/* SMP trampoline */
+	u32	smm_trampoline_start;
+	u32	smm_trampoline_header;
+#ifdef CONFIG_AMD_MEM_ENCRYPT
+	u32	sev_es_trampoline_start;
+#endif
+#ifdef CONFIG_X86_64
+	u32	smm_trampoline_start64;
+	u32	smm_trampoline_pgd;
+#endif
+	/* ACPI S3 wakeup */
+#ifdef CONFIG_ACPI_SLEEP
+	u32	wakeup_start;
+	u32	wakeup_header;
+#endif
+	/* APM/BIOS reboot */
+	u32	machine_real_restart_asm;
+#ifdef CONFIG_X86_64
+	u32	machine_real_restart_seg;
+#endif
+};
+
 /* This must match data at realmode/rm/trampoline_{32,64}.S */
 struct trampoline_header {
 #ifdef CONFIG_X86_32
@@ -56,6 +83,27 @@ struct trampoline_header {
 #endif
 };
 
+/* This must match data at realmode/rm/stub.S */
+struct stub_trampoline_header {
+#ifdef CONFIG_X86_32
+	u32 start;
+	u16 gdt_pad;
+	u16 gdt_limit;
+	u32 gdt_base;
+#else
+	u64 start;
+	u64 efer;
+	u32 cr4;
+	u32 flags;
+	u32 lock;
+#endif
+};
+
+extern struct stub_header *stub_header;
+extern unsigned char stub_blob_end[];
+extern unsigned char stub_blob[];
+extern unsigned char stub_relocs[];
+
 extern struct real_mode_header *real_mode_header;
 extern unsigned char real_mode_blob_end[];
 
@@ -65,6 +113,7 @@ extern unsigned long initial_stack;
 extern unsigned long initial_vc_handler;
 #endif
 
+// for now lets reuse it for the stub (?)
 extern u32 *trampoline_lock;
 
 extern unsigned char real_mode_blob[];

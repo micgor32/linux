@@ -119,12 +119,6 @@ static int setup_stack(struct smm_data *data)
 
 }
 
-static asmlinkage void do_reloc(void *arg)
-{
-	// nothing for now
-	printk(KERN_INFO "we are in SMM (lets get the hell out of here asap)\n");
-}
-
 /*static int load_initial_stub(uintptr_t loc, void *start)*/
 /*{*/
 /*	// again, placeholder*/
@@ -133,11 +127,11 @@ static asmlinkage void do_reloc(void *arg)
 /*	return 0;*/
 /*}*/
 
-static struct stub_data *stub_params;
+//extern struct stub_data stub_entry_params;
 extern uint8_t smm_relocation_start;
 extern uint8_t smm_relocation_end;
 
-static int load_trampoline(struct stub_data *params, uintptr_t location)
+static int load_trampoline(uintptr_t location)
 {
 	printk(KERN_INFO "location where stub will be placed 0x%x", location);
 	void __iomem *addr = ioremap((resource_size_t)location, &smm_relocation_end - &smm_relocation_start);
@@ -153,7 +147,10 @@ static int load_trampoline(struct stub_data *params, uintptr_t location)
 
 	memcpy_toio(addr, &smm_relocation_start, 
 			&smm_relocation_end - &smm_relocation_start);
+
+	// memcpy the address from
 	wbinvd();
+	
 	return 0;
 }
 
@@ -165,31 +162,32 @@ static int setup_stub_params(const uintptr_t smbase, const size_t smm_size, stru
 	/*	return -1;*/
 	/*}*/
 
-	stub_params = kmalloc(sizeof(*stub_params), GFP_KERNEL);
-	stub_params->stack_top = stack_top;
-	stub_params->stack_size = global_stack_size;
-	stub_params->c_handler = (uintptr_t)do_reloc; // pass that info together with state for later, will make my life easier when dealing with permanent handler
-	stub_params->cr3 = params->cr3;
+	//stub_params = kmalloc(sizeof(*stub_params), GFP_KERNEL);
+	
+	/*stub_entry_params.stack_top = stack_top;*/
+	/*stub_entry_params.stack_size = global_stack_size;*/
+	/*stub_entry_params.c_handler = (uintptr_t)do_reloc; // pass that info together with state for later, will make my life easier when dealing with permanent handler*/
+	/*stub_entry_params.cr3 = params->cr3;*/
 
-	int i;
+	/*int i;*/
+	/**/
+	/*for_each_online_cpu(i) {*/
+	/*	stub_entry_params.apic_to_cpu_num[i] = per_cpu(x86_cpu_to_apicid, i);*/
+	/*	printk(KERN_INFO "cpu %d, apic id %d", i, stub_entry_params.apic_to_cpu_num[i]);*/
+	/*}*/
+	/**/
+	/*if (i != params->cpu_count) {*/
+	/*	printk(KERN_ERR "Failed to set up APIC map\n");*/
+	/*	return -1;*/
+	/*}*/
 
-	for_each_online_cpu(i) {
-		stub_params->apic_to_cpu_num[i] = per_cpu(x86_cpu_to_apicid, i);
-		printk(KERN_INFO "cpu %d, apic id %d", i, stub_params->apic_to_cpu_num[i]);
-	}
-
-	if (i != params->cpu_count) {
-		printk(KERN_ERR "Failed to set up APIC map\n");
-		return -1;
-	}
-
-	if(load_trampoline(stub_params, stub_location))
+	if(load_trampoline(stub_location))
 		return 1;
 	
 	return 0;
 }
 
-static DEFINE_SPINLOCK(reloc_lock);
+//static DEFINE_SPINLOCK(reloc_lock);
 
 static void initiate_relocation(void)
 {
@@ -201,8 +199,6 @@ static void initiate_relocation(void)
 	while (x2apic && i--) {
 		cpu_relax();
 	}
-
-	//kfree(stub_params);
 }
 
 static int setup_reloc_handler(struct smm_state *params)
@@ -278,22 +274,21 @@ static int __init smm_loader_init(void)
 		printk(KERN_INFO "state 0x%llx", cb_data.smram.descriptor[i].region_state);
 	}
 
-	if (setup_stack(&cb_data)) {
-		printk(KERN_ERR "setting up stack failed");
-		return -1;
-	}
+	
+	/*if (load_reloc_handler(&cb_data)) {*/
+	/*	printk(KERN_ERR "loading reloc handler didnt worked");	*/
+	/*	return -1;*/
+	/*}*/
+	/**/
+	/**/
+	/*// load the handlers*/
+	/*if (load_permanent_handler(&cb_data)) {*/
+	/*	printk(KERN_ERR "loading permanent handler didnt worked");*/
+	/*	return -1;*/
+	/*}*/
+	const uintptr_t stub_location = SMM_DEFAULT_SMBASE + SMM_ENTRY_OFFSET;
 
-	if (load_reloc_handler(&cb_data)) {
-		printk(KERN_ERR "loading reloc handler didnt worked");	
-		return -1;
-	}
-
-
-	// load the handlers
-	if (load_permanent_handler(&cb_data)) {
-		printk(KERN_ERR "loading permanent handler didnt worked");
-		return -1;
-	}
+	//load_trampoline(stub_location);
 
 	initiate_relocation();
 	// for testing, lets see what happens
