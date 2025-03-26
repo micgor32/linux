@@ -21,6 +21,7 @@ struct real_mode_header {
 	/* SMP trampoline */
 	u32	trampoline_start;
 	u32	trampoline_header;
+	u32	smm_trampoline_start; // not sure if we even need it here, we call it from assembly code not C anyways.
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	u32	sev_es_trampoline_start;
 #endif
@@ -80,6 +81,7 @@ struct trampoline_header {
 	u32 cr4;
 	u32 flags;
 	u32 lock;
+	u64 smm_start;
 #endif
 };
 
@@ -127,7 +129,7 @@ extern unsigned char boot_gdt[];
 #else
 extern unsigned char secondary_startup_64[];
 extern unsigned char secondary_startup_64_no_verify[];
-extern unsigned char smm_startup64[];
+extern unsigned char smm_startup_64[];
 #endif
 
 static inline size_t real_mode_size_needed(void)

@@ -226,9 +226,15 @@ static void ap_calibrate_delay(void)
 	cpu_data(smp_processor_id()).loops_per_jiffy = loops_per_jiffy;
 }
 
+/*
+ * This code is supposed to be the C handler used for SMM relocation.
+ * For now its soley function is to panic the kernel (which I am not sure 
+ * whether it will have any effect since we are not in the kernel anymore 
+ * once this is executed).
+ */
 static void notrace test_p(void *unused)
 {
-	panic("lmaoooooooooooooooooo\n");
+	panic("Your code is obviously NOT CLEAR!\n");
 }
 
 /*

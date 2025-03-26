@@ -100,6 +100,51 @@ no_longmode:
 	jmp no_longmode
 SYM_CODE_END(trampoline_start)
 
+// remove later huge redundancy
+	.balign	PAGE_SIZE
+SYM_CODE_START(smm_trampoline_start)
+	cli			# We should be safe anyway
+	wbinvd
+
+	LJMPW_RM(1f)
+1:
+	mov	%cs, %ax	# Code and data in the same place
+	mov	%ax, %ds
+	mov	%ax, %es
+	mov	%ax, %ss
+
+	LOCK_AND_LOAD_REALMODE_ESP
+
+	call	verify_cpu		# Verify the cpu supports long mode
+	testl   %eax, %eax		# Check for return code
+	jnz	no_longmode_smm
+
+.Lswitch_smm_to_protected:
+	/*
+	 * GDT tables in non default location kernel can be beyond 16MB and
+	 * lgdt will not be able to load the address as in real mode default
+	 * operand size is 16bit. Use lgdtl instead to force operand size
+	 * to 32 bit.
+	 */
+
+	lidtl	tr_idt	# load idt with 0, 0
+	lgdtl	tr_gdt	# load gdt with whatever is appropriate
+
+	movw	$__KERNEL_DS, %dx	# Data segment descriptor
+
+	# Enable protected mode
+	movl	$(CR0_STATE & ~X86_CR0_PG), %eax
+	movl	%eax, %cr0		# into protected mode
+
+	# flush prefetch and jump to startup_32
+	ljmpl	$__KERNEL32_CS, $pa_smm_startup_32
+
+no_longmode_smm:
+	hlt
+	jmp no_longmode_smm
+SYM_CODE_END(smm_trampoline_start)
+// till here
+
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 /* SEV-ES supports non-zero IP for entry points - no alignment needed */
 SYM_CODE_START(sev_es_trampoline_start)
@@ -192,6 +237,78 @@ SYM_CODE_START(startup_32)
 	ljmpl	$__KERNEL_CS, $pa_startup_64
 SYM_CODE_END(startup_32)
 
+// another redundant piece of code to be removed later
+.balign 4
+SYM_CODE_START(smm_startup_32)
+	movl	%edx, %ss
+	addl	$pa_real_mode_base, %esp
+	movl	%edx, %ds
+	movl	%edx, %es
+	movl	%edx, %fs
+	movl	%edx, %gs
+
+	/*
+	 * Check for memory encryption support. This is a safety net in
+	 * case BIOS hasn't done the necessary step of setting the bit in
+	 * the MSR for this AP. If SME is active and we've gotten this far
+	 * then it is safe for us to set the MSR bit and continue. If we
+	 * don't we'll eventually crash trying to execute encrypted
+	 * instructions.
+	 */
+	btl	$TH_FLAGS_SME_ACTIVE_BIT, pa_tr_flags
+	jnc	.Ldonesmm
+	movl	$MSR_AMD64_SYSCFG, %ecx
+	rdmsr
+	bts	$MSR_AMD64_SYSCFG_MEM_ENCRYPT_BIT, %eax
+	jc	.Ldonesmm
+
+	/*
+	 * Memory encryption is enabled but the SME enable bit for this
+	 * CPU has has not been set.  It is safe to set it, so do so.
+	 */
+	wrmsr
+.Ldonesmm:
+
+	movl	pa_tr_cr4, %eax
+	movl	%eax, %cr4		# Enable PAE mode
+
+	# Setup trampoline 4 level pagetables
+	movl	$pa_trampoline_pgd, %eax
+	movl	%eax, %cr3
+
+	# Set up EFER
+	movl	$MSR_EFER, %ecx
+	rdmsr
+	/*
+	 * Skip writing to EFER if the register already has desired
+	 * value (to avoid #VE for the TDX guest).
+	 */
+	cmp	pa_tr_efer, %eax
+	jne	.Lwrite_efersmm
+	cmp	pa_tr_efer + 4, %edx
+	je	.Ldone_efersmm
+.Lwrite_efersmm:
+	movl	pa_tr_efer, %eax
+	movl	pa_tr_efer + 4, %edx
+	wrmsr
+
+.Ldone_efersmm:
+	# Enable paging and in turn activate Long Mode.
+	movl	$CR0_STATE, %eax
+	movl	%eax, %cr0
+
+	/*
+	 * At this point we're in long mode but in 32bit compatibility mode
+	 * with EFER.LME = 1, CS.L = 0, CS.D = 1 (and in turn
+	 * EFER.LMA = 1). Now we want to jump in 64bit mode, to do that we use
+	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
+	 */
+
+
+	ljmpl	$__KERNEL_CS, $pa_smm_startup_64
+SYM_CODE_END(smm_startup_32)
+// till here
+
 SYM_CODE_START(pa_trampoline_compat)
 	/*
 	 * In compatibility mode.  Prep ESP and DX for startup_32, then disable
@@ -210,9 +327,16 @@ SYM_CODE_END(pa_trampoline_compat)
 	.balign 4
 SYM_CODE_START(startup_64)
 	# Now jump into the kernel using virtual addresses
-	#jmpq
-	callq *tr_start(%rip)
+	// we need the logic here to either jump to the kernel on normal boot
+	// or to the tr_smm_start which will eventually call the handler (see smpboot.c L229).
+	// but for now we just duplicate the functions (amazing practice).
+	jmpq *tr_start(%rip)
 SYM_CODE_END(startup_64)
+
+	.balign 4
+SYM_CODE_START(smm_startup_64) // should be also removed later
+	jmpq *tr_smm_start(%rip)
+SYM_CODE_END(smm_startup_64)
 
 SYM_CODE_START(trampoline_start64)
 	/*
@@ -292,6 +416,7 @@ SYM_DATA_START(trampoline_header)
 	SYM_DATA(tr_cr4,		.space 4)
 	SYM_DATA(tr_flags,		.space 4)
 	SYM_DATA(tr_lock,		.space 4)
+	SYM_DATA(tr_smm_start,		.space 8)
 SYM_DATA_END(trampoline_header)
 
 #include "trampoline_common.S"

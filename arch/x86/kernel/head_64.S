@@ -449,7 +449,7 @@ SYM_CODE_START(smm_startup_64)
 	 * All non SEV-ES systems, especially Intel systems, need to execute
 	 * verify_cpu() above to make sure NX is enabled.
 	 */
-SYM_INNER_LABEL(secondary_startup_64_no_verify, SYM_L_GLOBAL)
+SYM_INNER_LABEL(secondary_smm_startup_64_no_verify, SYM_L_GLOBAL)
 	UNWIND_HINT_END_OF_STACK
 	ANNOTATE_NOENDBR
 
@@ -473,7 +473,7 @@ SYM_INNER_LABEL(secondary_startup_64_no_verify, SYM_L_GLOBAL)
 	 */
 	movq	%rax, %cr3
 
-SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
+SYM_INNER_LABEL(common_smm_startup_64, SYM_L_LOCAL)
 	UNWIND_HINT_END_OF_STACK
 	ANNOTATE_NOENDBR
 
@@ -521,20 +521,20 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	 */
 	movl	smpboot_control(%rip), %ecx
 	testl	$STARTUP_READ_APICID, %ecx
-	jnz	.Lread_apicid
+	jnz	.Lread_smm_apicid
 	/*
 	 * No control bit set, single CPU bringup. CPU number is provided
 	 * in bit 0-23. This is also the boot CPU case (CPU number 0).
 	 */
 	andl	$(~STARTUP_PARALLEL_MASK), %ecx
-	jmp	.Lsetup_cpu
+	jmp	.Lsetup_smm_cpu
 
-.Lread_apicid:
+.Lread_smm_apicid:
 	/* Check whether X2APIC mode is already enabled */
 	mov	$MSR_IA32_APICBASE, %ecx
 	rdmsr
 	testl	$X2APIC_ENABLE, %eax
-	jnz	.Lread_apicid_msr
+	jnz	.Lread_smm_apicid_msr
 
 #ifdef CONFIG_X86_X2APIC
 	/*
@@ -543,41 +543,41 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	 * be handled at that point.
 	 */
 	cmpl	$0, x2apic_mode(%rip)
-	jz	.Lread_apicid_mmio
+	jz	.Lread_smm_apicid_mmio
 
 	/* Force the AP into X2APIC mode. */
 	orl	$X2APIC_ENABLE, %eax
 	wrmsr
-	jmp	.Lread_apicid_msr
+	jmp	.Lread_smm_apicid_msr
 #endif
 
-.Lread_apicid_mmio:
+.Lread_smm_apicid_mmio:
 	/* Read the APIC ID from the fix-mapped MMIO space. */
 	movq	apic_mmio_base(%rip), %rcx
 	addq	$APIC_ID, %rcx
 	movl	(%rcx), %eax
 	shr	$24, %eax
-	jmp	.Llookup_AP
+	jmp	.Llookup_smm_AP
 
-.Lread_apicid_msr:
+.Lread_smm_apicid_msr:
 	mov	$APIC_X2APIC_ID_MSR, %ecx
 	rdmsr
 
-.Llookup_AP:
+.Llookup_smm_AP:
 	/* EAX contains the APIC ID of the current CPU */
 	xorl	%ecx, %ecx
 	leaq	cpuid_to_apicid(%rip), %rbx
 
-.Lfind_cpunr:
+.Lfind_smm_cpunr:
 	cmpl	(%rbx,%rcx,4), %eax
-	jz	.Lsetup_cpu
+	jz	.Lsetup_smm_cpu
 	inc	%ecx
 #ifdef CONFIG_FORCE_NR_CPUS
 	cmpl	$NR_CPUS, %ecx
 #else
 	cmpl	nr_cpu_ids(%rip), %ecx
 #endif
-	jb	.Lfind_cpunr
+	jb	.Lfind_smm_cpunr
 
 	/*  APIC ID not found in the table. Drop the trampoline lock and bail. */
 	movq	trampoline_lock(%rip), %rax
@@ -587,7 +587,7 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	hlt
 	jmp	1b
 
-.Lsetup_cpu:
+.Lsetup_smm_cpu:
 	/* Get the per cpu offset for the given CPU# which is in ECX */
 	movq	__per_cpu_offset(,%rcx,8), %rdx
 #else
@@ -609,10 +609,10 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	 */
 	movq	trampoline_lock(%rip), %rax
 	testq	%rax, %rax
-	jz	.Lsetup_gdt
+	jz	.Lsetup_smm_gdt
 	movl	$0, (%rax)
 
-.Lsetup_gdt:
+.Lsetup_smm_gdt:
 	/*
 	 * We must switch to a new descriptor in kernel space for the GDT
 	 * because soon the kernel won't have access anymore to the userspace
@@ -695,11 +695,25 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	/* Pass the boot_params pointer as first argument */
 	movq	%r15, %rdi
 
-.Ljump_to_C_code:
+.Ljump_to_handler:
 	xorl	%ebp, %ebp	# clear frame pointer
+	mov	$0x3f8, %dx
+	mov	$'C', %al
+	out	%al, (%dx)
+	mov	$'r', %al
+	out	%al, (%dx)
+	mov	$'a', %al
+	out	%al, (%dx)
+	mov	$'s', %al
+	out	%al, (%dx)
+	mov	$'h', %al
+	out	%al, (%dx) // lets see whether we can print something in smm before jumping to code (once we are actually there ofc)
 	ANNOTATE_RETPOLINE_SAFE
-	callq	*ending_code(%rip) # get it? because it was originally initial. peek humour (and engineering).
-	ud2
+	callq	*ending_code(%rip) // get it? because it was originally initial. peek humour (and engineering).
+	// hmm I assume the author wanted to indicate error in case the C code does something wrong,
+	// this makes sense, there is no intention of ever going back here, but if running in SMM we
+	// should issue RSM instead.
+	ud2 // rsm
 SYM_CODE_END(smm_startup_64)
 // end of duplicated code
 

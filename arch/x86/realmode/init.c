@@ -77,9 +77,9 @@ void __init reserve_real_mode(void)
 	// lets see whether this works
 	//set_smmstub_mem(0x38000);
 	
-	smmem = memblock_find_in_range(0x30000, 0x30000+65536, 65536, 65536);
-	memblock_reserve(smmem, 65536);
-	set_smmstub_mem(smmem);
+	/*smmem = memblock_find_in_range(0x30000, 0x30000+65536, 65536, 65536);*/
+	/*memblock_reserve(smmem, 65536);*/
+	/*set_smmstub_mem(smmem);*/
 
 	// lets see if we can reserve the space in default SMBASE
 	/*phys_addr_t smbase = 0x38000;*/
@@ -186,6 +186,7 @@ static void __init setup_real_mode(void)
 	trampoline_header->efer = efer & ~EFER_LMA;
 
 	trampoline_header->start = (u64) secondary_startup_64;
+	trampoline_header->smm_start = (u64) smm_startup_64;
 	trampoline_cr4_features = &trampoline_header->cr4;
 	*trampoline_cr4_features = mmu_cr4_features;
 
@@ -215,51 +216,51 @@ static void __init setup_real_mode(void)
 	// and the rest of the code would just take no effect.
 	//#ifdef CONFIG_SMM
 	// Not sure whether we need to do segment relocs, lets see
-	u16 stub_seg;
-	const u32 *rel_stub;
-	u32 count_stub;
-	//unsigned char *base;
-	//unsigned long phys_base;
-	struct stub_trampoline_header *stub_trampoline_header;
-	// see whether PAGE_ALIGN is needed, I don"t think so though, 16 here is 
-	// mysterious for me, see what for we add it
-	size_t stub_size = stub_blob_end - stub_blob;
-#ifdef CONFIG_X86_64
-	u64 *smm_trampoline_pgd;
-	u64 smm_efer;
-	int y;
-#endif
-	const uintptr_t location = 0x38000;
-	// now we put the stub in smbase, hardoded for now, see whether we can pass params that early 
-	void __iomem *addr = ioremap((resource_size_t)location, stub_size);
-
-	memcpy_toio(addr, stub_blob, stub_size);
-	wbinvd(); // again check if needed
-	pr_info("we've got through copying blob to smbase\n");
-
-
-	// we can hardcode this for now (i think)
-	stub_seg = location >> 4;
-	rel_stub = (u32 *) stub_relocs;
-	
-	/* 16-bit segment relocations. */
-	count_stub = *rel_stub++;
-	while (count_stub--) {
-		u16 *seg = (u16 *) (addr + *rel_stub++);
-		*seg = stub_seg;
-	}
-
-	/* 32-bit linear relocations. */
-	count_stub = *rel_stub++;
-	while (count_stub--) {
-		u32 *ptr = (u32 *) (addr + *rel_stub++);
-		*ptr += location;
-	}
-
-	pr_info("first potential null dereference, but hey relocs are done (hopefully)\n");
-	stub_trampoline_header = (struct stub_trampoline_header *)
-		__va(stub_header->smm_trampoline_header);
-
+/*	u16 stub_seg;*/
+/*	const u32 *rel_stub;*/
+/*	u32 count_stub;*/
+/*	//unsigned char *base;*/
+/*	//unsigned long phys_base;*/
+/*	struct stub_trampoline_header *stub_trampoline_header;*/
+/*	// see whether PAGE_ALIGN is needed, I don"t think so though, 16 here is */
+/*	// mysterious for me, see what for we add it*/
+/*	size_t stub_size = stub_blob_end - stub_blob;*/
+/*#ifdef CONFIG_X86_64*/
+/*	u64 *smm_trampoline_pgd;*/
+/*	u64 smm_efer;*/
+/*	int y;*/
+/*#endif*/
+	/*const uintptr_t location = 0x38000;*/
+	/*// now we put the stub in smbase, hardoded for now, see whether we can pass params that early */
+	/*void __iomem *addr = ioremap((resource_size_t)location, stub_size);*/
+	/**/
+	/*memcpy_toio(addr, stub_blob, stub_size);*/
+	/*wbinvd(); // again check if needed*/
+	/*pr_info("we've got through copying blob to smbase\n");*/
+	/**/
+	/**/
+	/*// we can hardcode this for now (i think)*/
+	/*stub_seg = location >> 4;*/
+	/*rel_stub = (u32 *) stub_relocs;*/
+	/**/
+	/*/* 16-bit segment relocations. */
+	/*count_stub = *rel_stub++;*/
+	/*while (count_stub--) {*/
+	/*	u16 *seg = (u16 *) (addr + *rel_stub++);*/
+	/*	*seg = stub_seg;*/
+	/*}*/
+	/**/
+	/*/* 32-bit linear relocations. */
+	/*count_stub = *rel_stub++;*/
+	/*while (count_stub--) {*/
+	/*	u32 *ptr = (u32 *) (addr + *rel_stub++);*/
+	/*	*ptr += location;*/
+	/*}*/
+	/**/
+	/*pr_info("first potential null dereference, but hey relocs are done (hopefully)\n");*/
+	/*stub_trampoline_header = (struct stub_trampoline_header *)*/
+	/*	__va(stub_header->smm_trampoline_header);*/
+	/**/
  /* We skip the case with AMD_MEM_ENCTYPT, not needed for now.*/
  /* Technically we could skipp the case with 32bit config, wont be executed anyways during testing (LB doesnt work on a testing board when compiled in 32bit)*/
  /* This whole section will probably be stripped down anyways, for eg. we do not need kernel mappings in PGD (at least I dont see the use for it rn).*/
@@ -272,34 +273,34 @@ static void __init setup_real_mode(void)
  /*  - not sure whether we can have conditional statement within the trampoline, even if (based on config or so), it would be a mess (even more than it is now lol).*/
  /* Rest of the assigned data is same as for the normal trampoline. TODO: could be that we need SoC specific definitions, for that we are back at the CBTABLE parsing,*/
  /* which is problematic if we run this code here - realmode code runs waaaaay before any drivers.*/
-#ifdef CONFIG_X86_32
-	trampoline_header->start = __pa_symbol(startup_32_smp);
-	trampoline_header->gdt_limit = __BOOT_DS + 7;
-	trampoline_header->gdt_base = __pa_symbol(boot_gdt);
-#else
+/*#ifdef CONFIG_X86_32*/
+/*	trampoline_header->start = __pa_symbol(startup_32_smp);*/
+/*	trampoline_header->gdt_limit = __BOOT_DS + 7;*/
+/*	trampoline_header->gdt_base = __pa_symbol(boot_gdt);*/
+/*#else*/
 	/*
 	 * Some AMD processors will #GP(0) if EFER.LMA is set in WRMSR
 	 * so we need to mask it out.
 	 */
-	rdmsrl(MSR_EFER, smm_efer);
-	stub_trampoline_header->efer = efer & ~EFER_LMA;
-
-	stub_trampoline_header->start = (u64) smm_test;
-	smm_trampoline_cr4_features = &stub_trampoline_header->cr4;
-	// hmm, it seems this is needed for hibernation? Not sure so lets leave it as it is.
-	*smm_trampoline_cr4_features = mmu_cr4_features;
-
-	stub_trampoline_header->flags = 0;
-
-	// commented out, seems we do not need it (?)
-	//trampoline_lock = &trampoline_header->lock;
-	//*trampoline_lock = 0;
-
-	smm_trampoline_pgd = (u64 *) __va(stub_header->smm_trampoline_pgd);
-
-	/* Map the real mode stub as virtual == physical */
-	smm_trampoline_pgd[0] = smm_pgd_entry.pgd;
-
+	/*rdmsrl(MSR_EFER, smm_efer);*/
+	/*stub_trampoline_header->efer = efer & ~EFER_LMA;*/
+	/**/
+	/*stub_trampoline_header->start = (u64) smm_test;*/
+	/*smm_trampoline_cr4_features = &stub_trampoline_header->cr4;*/
+	/*// hmm, it seems this is needed for hibernation? Not sure so lets leave it as it is.*/
+	/**smm_trampoline_cr4_features = mmu_cr4_features;*/
+	/**/
+	/*stub_trampoline_header->flags = 0;*/
+	/**/
+	/*// commented out, seems we do not need it (?)*/
+	/*//trampoline_lock = &trampoline_header->lock;*/
+	/*/trampoline_lock = 0;*/
+	/**/
+	/*smm_trampoline_pgd = (u64 *) __va(stub_header->smm_trampoline_pgd);*/
+	/**/
+	/*/* Map the real mode stub as virtual == physical */
+	/*smm_trampoline_pgd[0] = smm_pgd_entry.pgd;*/
+	/**/
 	/*
 	 * Include the entirety of the kernel mapping into the trampoline
 	 * PGD.  This way, all mappings present in the normal kernel page
@@ -307,7 +308,7 @@ static void __init setup_real_mode(void)
 	 */
 	/*for (y = pgd_index(__PAGE_OFFSET); i < PTRS_PER_PGD; i++)*/
 	/*	trampoline_pgd[i] = init_top_pgt[i].pgd;*/
-#endif
+//#endif
 
 
 //#endif

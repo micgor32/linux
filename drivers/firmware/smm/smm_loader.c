@@ -128,25 +128,24 @@ static int setup_stack(struct smm_data *data)
 /*}*/
 
 //extern struct stub_data stub_entry_params;
-extern uint8_t smm_relocation_start;
-extern uint8_t smm_relocation_end;
+extern u32 smm_relocation_start;
+//extern uint8_t smm_relocation_end;
 
 static int load_trampoline(uintptr_t location)
 {
 	printk(KERN_INFO "location where stub will be placed 0x%x", location);
-	void __iomem *addr = ioremap((resource_size_t)location, &smm_relocation_end - &smm_relocation_start);
+	void __iomem *addr = ioremap((resource_size_t)location, 47);
 	if (!addr) {
 		printk(KERN_ERR "Failed to ioremap the target address\n");
 		return -ENOMEM;
 	}
-	
+
 	// debug prints remove
 	printk(KERN_INFO "virt 0x%lx\n", addr);
 	printk(KERN_INFO "src 0x%lx\n", &smm_relocation_start);
 	// ...till here	
 
-	memcpy_toio(addr, &smm_relocation_start, 
-			&smm_relocation_end - &smm_relocation_start);
+	memcpy_toio(addr, &smm_relocation_start, 47);
 
 	// memcpy the address from
 	wbinvd();
@@ -288,7 +287,7 @@ static int __init smm_loader_init(void)
 	/*}*/
 	const uintptr_t stub_location = SMM_DEFAULT_SMBASE + SMM_ENTRY_OFFSET;
 
-	//load_trampoline(stub_location);
+	load_trampoline(stub_location);
 
 	initiate_relocation();
 	// for testing, lets see what happens
