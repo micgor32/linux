@@ -50,20 +50,46 @@ void load_trampoline_pgtable(void)
 
 void __init reserve_real_mode(void)
 {
-	phys_addr_t mem;
+	phys_addr_t mem, smmem;
 	size_t size = real_mode_size_needed();
+	size_t smsize = smm_stub_size_needed();
 
-	if (!size)
+	if (!size) {
+		pr_info("no size for rm trampoline\n");
 		return;
+	}
+
+	pr_info("size needed for rm trampoline and stuff %zx\n", size);
+
+	if (!smsize)
+		pr_info("no size for smmstub\n");
 
 	WARN_ON(slab_is_available());
 
 	/* Has to be under 1M so we can execute real-mode AP code. */
 	mem = memblock_phys_alloc_range(size, PAGE_SIZE, 0, 1<<20);
+	pr_info("mem for real mode 0x%llu", mem);
 	if (!mem)
 		pr_info("No sub-1M memory is available for the trampoline\n");
 	else
 		set_real_mode_mem(mem);
+
+	// lets see whether this works
+	//set_smmstub_mem(0x38000);
+	
+	smmem = memblock_find_in_range(0x30000, 0x30000+65536, 65536, 65536);
+	memblock_reserve(smmem, 65536);
+	set_smmstub_mem(smmem);
+
+	// lets see if we can reserve the space in default SMBASE
+	/*phys_addr_t smbase = 0x38000;*/
+	/*phys_addr_t end = 0x3FFFF;*/
+	/*smmem = memblock_phys_alloc_range(smsize, PAGE_SIZE, 1<<20, 1<<21);*/
+	/*pr_info("mem for stub header 0x%llu", smmem);*/
+	/*if (!smmem)*/
+	/*	pr_info("No sub-1M memory is available for the SMM trampoline\n");*/
+	/*else*/
+	/*	set_smmstub_mem(smmem);*/
 
 	/*
 	 * Unconditionally reserve the entire first 1M, see comment in
@@ -93,6 +119,7 @@ static void __init sme_sev_setup_real_mode(struct trampoline_header *th)
 
 void smm_test(void)
 {
+	pr_info("test\n");
 	early_printk("wont work anyways\n");
 }
 
@@ -196,21 +223,23 @@ static void __init setup_real_mode(void)
 	struct stub_trampoline_header *stub_trampoline_header;
 	// see whether PAGE_ALIGN is needed, I don"t think so though, 16 here is 
 	// mysterious for me, see what for we add it
-	size_t stub_size = 16 + stub_blob_end - stub_blob;
+	size_t stub_size = stub_blob_end - stub_blob;
 #ifdef CONFIG_X86_64
 	u64 *smm_trampoline_pgd;
 	u64 smm_efer;
 	int y;
 #endif
+	const uintptr_t location = 0x38000;
 	// now we put the stub in smbase, hardoded for now, see whether we can pass params that early 
-	void __iomem *addr = ioremap((resource_size_t)0x38000, stub_size);
-	
+	void __iomem *addr = ioremap((resource_size_t)location, stub_size);
+
 	memcpy_toio(addr, stub_blob, stub_size);
 	wbinvd(); // again check if needed
-	
+	pr_info("we've got through copying blob to smbase\n");
 
-// we can hardcode this for now (i think)
-	stub_seg = 0x38000 >> 4;
+
+	// we can hardcode this for now (i think)
+	stub_seg = location >> 4;
 	rel_stub = (u32 *) stub_relocs;
 	
 	/* 16-bit segment relocations. */
@@ -224,25 +253,25 @@ static void __init setup_real_mode(void)
 	count_stub = *rel_stub++;
 	while (count_stub--) {
 		u32 *ptr = (u32 *) (addr + *rel_stub++);
-		*ptr += 0x38000;
+		*ptr += location;
 	}
 
+	pr_info("first potential null dereference, but hey relocs are done (hopefully)\n");
 	stub_trampoline_header = (struct stub_trampoline_header *)
 		__va(stub_header->smm_trampoline_header);
 
-// We skip the case with AMD_MEM_ENCTYPT, not needed for now.
-// Technically we could skipp the case with 32bit config, wont be executed anyways during testing (LB doesnt work on a testing board when compiled in 32bit)
-// This whole section will probably be stripped down anyways, for eg. we do not need kernel mappings in PGD (at least I dont see the use for it rn).
-// The whole purpose of rewriting this section is to setup the (another) trampoline to jump not to the kernel startup code but to our relocation handler.
-// There could be a more elegant way to do so, but there are couple of problems: 
-//  - trampoline code has to be placed at SMBASE, meanwhile the trapoline for the kernel does not have such requirement, tbh I dont know
-//    where exactly it is placed, we could check that but I dont see that as useful information (at least rn). This forces us to write new trampoline
-//    basically and place it there. One consideration could be, does it have to be done so early in the boot? The whole logic here is to reserve low memory 
-//    early enough so that it is available (if I understood correctly), but, SMRAM address space won't be allocated anyways, so (for later), we could just
-//    move all this code to the later stage - so as a driver as planned initially - we know that copying that code to SMBASE from (loadable)module also works.
-//  - not sure whether we can have conditional statement within the trampoline, even if (based on config or so), it would be a mess (even more than it is now lol).
-// Rest of the assigned data is same as for the normal trampoline. TODO: could be that we need SoC specific definitions, for that we are back at the CBTABLE parsing,
-// which is problematic if we run this code here - realmode code runs waaaaay before any drivers.
+ /* We skip the case with AMD_MEM_ENCTYPT, not needed for now.*/
+ /* Technically we could skipp the case with 32bit config, wont be executed anyways during testing (LB doesnt work on a testing board when compiled in 32bit)*/
+ /* This whole section will probably be stripped down anyways, for eg. we do not need kernel mappings in PGD (at least I dont see the use for it rn).*/
+ /* The whole purpose of rewriting this section is to setup the (another) trampoline to jump not to the kernel startup code but to our relocation handler.*/
+ /* There could be a more elegant way to do so, but there are couple of problems: */
+ /*  - trampoline code has to be placed at SMBASE, meanwhile the trapoline for the kernel does not have such requirement, as long as it is in the lowest 1MB. This forces us to write new trampoline*/
+ /*    basically and place it there. One consideration could be, does it have to be done so early in the boot? The whole logic here is to reserve low memory */
+ /*    early enough so that it is available (if I understood correctly), but, SMRAM address space won't be allocated anyways, so (for later), we could just*/
+ /*    move all this code to the later stage - so as a driver as planned initially - we know that copying that code to SMBASE from (loadable)module also works.*/
+ /*  - not sure whether we can have conditional statement within the trampoline, even if (based on config or so), it would be a mess (even more than it is now lol).*/
+ /* Rest of the assigned data is same as for the normal trampoline. TODO: could be that we need SoC specific definitions, for that we are back at the CBTABLE parsing,*/
+ /* which is problematic if we run this code here - realmode code runs waaaaay before any drivers.*/
 #ifdef CONFIG_X86_32
 	trampoline_header->start = __pa_symbol(startup_32_smp);
 	trampoline_header->gdt_limit = __BOOT_DS + 7;
@@ -320,6 +349,8 @@ void __init init_real_mode(void)
 {
 	if (!real_mode_header)
 		panic("Real mode trampoline was not allocated");
+	/*if (!stub_header)*/
+	/*	panic("SMM stub trampoline was not allocated");*/
 
 	setup_real_mode();
 	set_real_mode_permissions();

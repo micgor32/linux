@@ -187,6 +187,8 @@ SYM_CODE_START(startup_32)
 	 * EFER.LMA = 1). Now we want to jump in 64bit mode, to do that we use
 	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
 	 */
+
+
 	ljmpl	$__KERNEL_CS, $pa_startup_64
 SYM_CODE_END(startup_32)
 
@@ -208,7 +210,8 @@ SYM_CODE_END(pa_trampoline_compat)
 	.balign 4
 SYM_CODE_START(startup_64)
 	# Now jump into the kernel using virtual addresses
-	jmpq	*tr_start(%rip)
+	#jmpq
+	callq *tr_start(%rip)
 SYM_CODE_END(startup_64)
 
 SYM_CODE_START(trampoline_start64)

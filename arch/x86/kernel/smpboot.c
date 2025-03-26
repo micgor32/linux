@@ -226,6 +226,11 @@ static void ap_calibrate_delay(void)
 	cpu_data(smp_processor_id()).loops_per_jiffy = loops_per_jiffy;
 }
 
+static void notrace test_p(void *unused)
+{
+	panic("lmaoooooooooooooooooo\n");
+}
+
 /*
  * Activate a secondary processor.
  */
@@ -854,6 +859,8 @@ static int do_boot_cpu(u32 apicid, int cpu, struct task_struct *idle)
 #endif
 	idle->thread.sp = (unsigned long)task_pt_regs(idle);
 	initial_code = (unsigned long)start_secondary;
+	// just testing
+	ending_code = (unsigned long)test_p;
 
 	if (IS_ENABLED(CONFIG_X86_32)) {
 		early_gdt_descr.address = (unsigned long)get_cpu_gdt_rw(cpu);

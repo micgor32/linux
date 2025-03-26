@@ -210,7 +210,19 @@ SYM_CODE_START(startup_64)
 	# Now jump into the kernel using virtual addresses
 	// should be a call here instead of jump I believe, lets see
 	//jmpq	*tr_start(%rip)
+	mov	$0x3f8, %dx
+	mov	$'C', %al
+	out	%al, (%dx)
+	mov	$'r', %al
+	out	%al, (%dx)
+	mov	$'a', %al
+	out	%al, (%dx)
+	mov	$'s', %al
+	out	%al, (%dx)
+	mov	$'h', %al
+	out	%al, (%dx)
 	callq *tr_start(%rip)
+	rsm
 SYM_CODE_END(startup_64)
 
 SYM_CODE_START(smm_trampoline_start64)

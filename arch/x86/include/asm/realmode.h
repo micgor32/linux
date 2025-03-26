@@ -109,6 +109,7 @@ extern unsigned char real_mode_blob_end[];
 
 extern unsigned long initial_code;
 extern unsigned long initial_stack;
+extern unsigned long ending_code;
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 extern unsigned long initial_vc_handler;
 #endif
@@ -122,9 +123,11 @@ extern unsigned char real_mode_relocs[];
 #ifdef CONFIG_X86_32
 extern unsigned char startup_32_smp[];
 extern unsigned char boot_gdt[];
+// add here the startup for smm fi compiled in 32bit mode
 #else
 extern unsigned char secondary_startup_64[];
 extern unsigned char secondary_startup_64_no_verify[];
+extern unsigned char smm_startup64[];
 #endif
 
 static inline size_t real_mode_size_needed(void)
@@ -135,9 +138,30 @@ static inline size_t real_mode_size_needed(void)
 	return ALIGN(real_mode_blob_end - real_mode_blob, PAGE_SIZE);
 }
 
+/* I could just extend the function above, but it is also used by */
+/* arch/x86/platform/efi/quirks.c so I don't want to mess their logic. */
+/* BTW someone should consider defining the functions in appropriate place, */
+/* header file is NOT a place for that. */
+
+static inline size_t smm_stub_size_needed(void)
+{
+	pr_info("we check the stub size");
+	if (stub_header)
+		return 0;
+	pr_info("not assigned yet, the size is %zx", stub_blob_end - stub_blob);
+
+	return stub_blob_end - stub_blob;
+}
+
 static inline void set_real_mode_mem(phys_addr_t mem)
 {
 	real_mode_header = (struct real_mode_header *) __va(mem);
+}
+
+static inline void set_smmstub_mem(phys_addr_t mem)
+{
+	pr_info("header will be allocated at 0x%llu", mem);
+	stub_header = (struct stub_header *) __va(mem);
 }
 
 void reserve_real_mode(void);
