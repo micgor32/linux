@@ -16,12 +16,13 @@
 #include <asm/realmode.h>
 
 // This is bad solution to import it all (since we do not need most of it) but lets not care about that for now 
-#include "../../../arch/x86/realmode/rm/trampoline_64.S"
-#include "../../../arch/x86/realmode/rm/header.S"
-#include "../../../arch/x86/realmode/rm/stack.S"
-#include "../../../arch/x86/realmode/rm/reboot.S"
-#include "../../../arch/x86/realmode/rm/pasyms.h"
+//#include "../../../arch/x86/realmode/rm/trampoline_64.S"
+//#include "../../../arch/x86/realmode/rm/header.S"
+//#include "../../../arch/x86/realmode/rm/stack.S"
+//#include "../../../arch/x86/realmode/rm/reboot.S"
+//#include "../../../arch/x86/realmode/rm/pasyms2.h" // amazing, remove later
 
+// this code is going to be placed under 0x38000
 .code16
 SYM_CODE_START(smm_relocation_start)
 	mov	$0x3f8, %dx
@@ -35,8 +36,8 @@ SYM_CODE_START(smm_relocation_start)
 	out	%al, (%dx)
 	mov	$'h', %al
 	out	%al, (%dx)
-	jmp	smm_trampoline_start
+	//jmp	tr_address
 
 	rsm
-
+// maybe add here "old styled" symbol to indicate end of the section to be copied (for size calc).
 SYM_CODE_END(smm_relocation_start)

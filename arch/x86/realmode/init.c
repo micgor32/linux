@@ -5,6 +5,10 @@
 #include <linux/cc_platform.h>
 #include <linux/pgtable.h>
 
+// for testing only
+#include <linux/kernel.h>
+// end
+
 #include <asm/set_memory.h>
 #include <asm/realmode.h>
 #include <asm/tlbflush.h>
@@ -123,6 +127,28 @@ void smm_test(void)
 	early_printk("wont work anyways\n");
 }
 
+void notrace test_p(void)
+{
+	asm volatile (
+        "movw $0x3f8, %%dx\n\t"
+        "movb $'h', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'e', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'l', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'l', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'o', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'\n', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        :
+        :
+        : "al", "dx"
+	);
+}
+
 static void __init setup_real_mode(void)
 {
 	u16 real_mode_seg;
@@ -172,6 +198,22 @@ static void __init setup_real_mode(void)
 	/* Must be performed *after* relocation. */
 	trampoline_header = (struct trampoline_header *)
 		__va(real_mode_header->trampoline_header);
+	// copying reloc code to smbase
+	const uintptr_t location = 0x38000;
+	void *v;
+	v = phys_to_virt(location);
+	memcpy(v, __va(real_mode_header->smm_trampoline_start), 175);
+
+	/*u32 blob;*/
+	/*blob = real_mode_header->smm_relocation_start;*/
+	/**/
+	//printk("address of the relocation start is 0x%\n", (unsigned int)&smm_relocation_start);
+
+	/*void __iomem *addr = ioremap((resource_size_t)location, 47); // hardcode size, beautiful*/
+	/*memcpy_toio(addr, &blob, 47);*/
+	/*wbinvd();*/
+	test_p();
+	printk("reloc code should be under 0x38000 (I think), the address is 0x%lx\n", (unsigned long)__va(real_mode_header->smm_relocation_start));
 
 #ifdef CONFIG_X86_32
 	trampoline_header->start = __pa_symbol(startup_32_smp);
@@ -186,7 +228,7 @@ static void __init setup_real_mode(void)
 	trampoline_header->efer = efer & ~EFER_LMA;
 
 	trampoline_header->start = (u64) secondary_startup_64;
-	trampoline_header->smm_start = (u64) smm_startup_64;
+	trampoline_header->smm_start = (u64) test_p; //smm_startup_64;
 	trampoline_cr4_features = &trampoline_header->cr4;
 	*trampoline_cr4_features = mmu_cr4_features;
 

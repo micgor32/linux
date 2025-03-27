@@ -440,6 +440,21 @@ SYM_CODE_START(smm_startup_64)
 	/* Sanitize CPU configuration */
 	call verify_cpu
 
+	mov	$0x3f8, %dx
+	mov	$'s', %al
+	out	%al, (%dx)
+	mov	$'t', %al
+	out	%al, (%dx)
+	mov	$'a', %al
+	out	%al, (%dx)
+	mov	$'r', %al
+	out	%al, (%dx)
+	mov	$'t', %al
+	out	%al, (%dx)
+	mov	$'p', %al
+	out	%al, (%dx)
+	rsm
+
 	/*
 	 * The secondary_startup_64_no_verify entry point is only used by
 	 * SEV-ES guests. In those guests the call to verify_cpu() would cause
@@ -697,23 +712,12 @@ SYM_INNER_LABEL(common_smm_startup_64, SYM_L_LOCAL)
 
 .Ljump_to_handler:
 	xorl	%ebp, %ebp	# clear frame pointer
-	mov	$0x3f8, %dx
-	mov	$'C', %al
-	out	%al, (%dx)
-	mov	$'r', %al
-	out	%al, (%dx)
-	mov	$'a', %al
-	out	%al, (%dx)
-	mov	$'s', %al
-	out	%al, (%dx)
-	mov	$'h', %al
-	out	%al, (%dx) // lets see whether we can print something in smm before jumping to code (once we are actually there ofc)
 	ANNOTATE_RETPOLINE_SAFE
 	callq	*ending_code(%rip) // get it? because it was originally initial. peek humour (and engineering).
 	// hmm I assume the author wanted to indicate error in case the C code does something wrong,
 	// this makes sense, there is no intention of ever going back here, but if running in SMM we
 	// should issue RSM instead.
-	ud2 // rsm
+	//ud2 // rsm
 SYM_CODE_END(smm_startup_64)
 // end of duplicated code
 

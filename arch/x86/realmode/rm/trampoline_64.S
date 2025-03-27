@@ -32,6 +32,21 @@
 #include <asm/segment.h>
 #include <asm/processor-flags.h>
 #include <asm/realmode.h>
+// these imports are becaouse of the section from head_64.S, some may not be needed but idc at the time
+#include <linux/pgtable.h>
+#include <linux/threads.h>
+#include <linux/export.h>
+#include <linux/pgtable.h>
+#include <asm/cache.h>
+#include <asm/processor-flags.h>
+#include <asm/percpu.h>
+#include <asm/nops.h>
+#include "../../entry/calling.h"
+#include <asm/nospec-branch.h>
+#include <asm/apicdef.h>
+#include <asm/fixmap.h>
+#include <asm/smp.h>
+#include <asm/thread_info.h>
 #include "realmode.h"
 
 	.text
@@ -135,6 +150,7 @@ SYM_CODE_START(smm_trampoline_start)
 	# Enable protected mode
 	movl	$(CR0_STATE & ~X86_CR0_PG), %eax
 	movl	%eax, %cr0		# into protected mode
+	//rsm
 
 	# flush prefetch and jump to startup_32
 	ljmpl	$__KERNEL32_CS, $pa_smm_startup_32
@@ -144,6 +160,42 @@ no_longmode_smm:
 	jmp no_longmode_smm
 SYM_CODE_END(smm_trampoline_start)
 // till here
+
+// we MAY not need this 
+SYM_CODE_START(smm_relocation_start)
+	mov	$0x3f8, %dx
+	mov	$'C', %al
+	out	%al, (%dx)
+	mov	$'r', %al
+	out	%al, (%dx)
+	mov	$'a', %al
+	out	%al, (%dx)
+	mov	$'s', %al
+	out	%al, (%dx)
+	mov	$'h', %al
+	out	%al, (%dx)
+	mov	$'h', %al
+	out	%al, (%dx)
+	jmp	fck
+
+fck:
+	mov	$0x3f8, %dx
+	mov	$'C', %al
+	out	%al, (%dx)
+	mov	$'r', %al
+	out	%al, (%dx)
+	mov	$'a', %al
+	out	%al, (%dx)
+	mov	$'s', %al
+	out	%al, (%dx)
+	mov	$'h', %al
+	out	%al, (%dx)
+	mov	$'h', %al
+	out	%al, (%dx)
+
+	rsm
+// maybe add here "old styled" symbol to indicate end of the section to be copied (for size calc).
+SYM_CODE_END(smm_relocation_start)
 
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 /* SEV-ES supports non-zero IP for entry points - no alignment needed */
@@ -304,8 +356,8 @@ SYM_CODE_START(smm_startup_32)
 	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
 	 */
 
-
-	ljmpl	$__KERNEL_CS, $pa_smm_startup_64
+	// change to jump to the stuff from this file
+	ljmpl	$__KERNEL_CS, $pa_startup_64_smm
 SYM_CODE_END(smm_startup_32)
 // till here
 
@@ -334,9 +386,24 @@ SYM_CODE_START(startup_64)
 SYM_CODE_END(startup_64)
 
 	.balign 4
-SYM_CODE_START(smm_startup_64) // should be also removed later
+SYM_CODE_START(startup_64_smm) // should be also removed later
+	mov	$0x3f8, %dx
+	mov	$'s', %al
+	out	%al, (%dx)
+	mov	$'t', %al
+	out	%al, (%dx)
+	mov	$'a', %al
+	out	%al, (%dx)
+	mov	$'r', %al
+	out	%al, (%dx)
+	mov	$'t', %al
+	out	%al, (%dx)
+	mov	$'p', %al
+	out	%al, (%dx)
+	callq *tr_smm_start(%rip)
+	rsm
 	jmpq *tr_smm_start(%rip)
-SYM_CODE_END(smm_startup_64)
+SYM_CODE_END(startup_64_smm)
 
 SYM_CODE_START(trampoline_start64)
 	/*

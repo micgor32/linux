@@ -287,7 +287,7 @@ static int __init smm_loader_init(void)
 	/*}*/
 	const uintptr_t stub_location = SMM_DEFAULT_SMBASE + SMM_ENTRY_OFFSET;
 
-	load_trampoline(stub_location);
+	//load_trampoline(stub_location);
 
 	initiate_relocation();
 	// for testing, lets see what happens

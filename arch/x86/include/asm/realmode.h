@@ -22,6 +22,7 @@ struct real_mode_header {
 	u32	trampoline_start;
 	u32	trampoline_header;
 	u32	smm_trampoline_start; // not sure if we even need it here, we call it from assembly code not C anyways.
+	u32	smm_relocation_start;
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	u32	sev_es_trampoline_start;
 #endif
@@ -121,6 +122,8 @@ extern u32 *trampoline_lock;
 
 extern unsigned char real_mode_blob[];
 extern unsigned char real_mode_relocs[];
+
+extern unsigned char smm_relocation_start[];
 
 #ifdef CONFIG_X86_32
 extern unsigned char startup_32_smp[];

@@ -234,7 +234,7 @@ static void ap_calibrate_delay(void)
  */
 static void notrace test_p(void *unused)
 {
-	panic("Your code is obviously NOT CLEAR!\n");
+	//panic("Your code is obviously NOT CLEAR!\n");
 }
 
 /*
@@ -867,6 +867,8 @@ static int do_boot_cpu(u32 apicid, int cpu, struct task_struct *idle)
 	initial_code = (unsigned long)start_secondary;
 	// just testing
 	ending_code = (unsigned long)test_p;
+
+	pr_info("ending_code is pointing to 0x%lx", ending_code);
 
 	if (IS_ENABLED(CONFIG_X86_32)) {
 		early_gdt_descr.address = (unsigned long)get_cpu_gdt_rw(cpu);

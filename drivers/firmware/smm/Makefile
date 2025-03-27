@@ -29,7 +29,6 @@ clean:
 	rm -f *.mod.*
 	rm -f *.ko
 	rm -f *.o
-	rm -r .*
 	rm -f modules.order
 	rm -f Module.symvers
 # help:
