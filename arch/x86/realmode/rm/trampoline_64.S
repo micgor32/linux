@@ -400,9 +400,91 @@ SYM_CODE_START(startup_64_smm) // should be also removed later
 	out	%al, (%dx)
 	mov	$'p', %al
 	out	%al, (%dx)
-	callq *tr_smm_start(%rip)
+
+.Lread_apicid:
+	/* Check whether X2APIC mode is already enabled */
+	mov	$MSR_IA32_APICBASE, %ecx
+	rdmsr
+	testl	$X2APIC_ENABLE, %eax
+	jnz	.Lread_apicid_msr
+
+#ifdef CONFIG_X86_X2APIC
+	/*
+	 * If system is in X2APIC mode then MMIO base might not be
+	 * mapped causing the MMIO read below to fault. Faults can't
+	 * be handled at that point.
+	 */
+	cmpl	$0, x2apic_mode(%rip)
+	jz	.Lread_apicid_mmio
+
+	/* Force the AP into X2APIC mode. */
+	orl	$X2APIC_ENABLE, %eax
+	wrmsr
+	jmp	.Lread_apicid_msr
+#endif
+
+
+.Lread_apicid_mmio:
+	/* Read the APIC ID from the fix-mapped MMIO space. */
+	//movq	apic_mmio_base(%rip), %rcx
+	//addq	$APIC_ID, %rcx
+	movl	$1, %eax		//(%rcx), %eax
+	cpuid
+	shr	$24, %eax
+	jmp	.Lapicid_end
+
+.Lread_apicid_msr:
+	mov	$APIC_X2APIC_ID_MSR, %ecx
+	rdmsr
+
+.Lapicid_end:
+	/* EAX contains the APIC ID of the current CPU */
+	xorl	%ecx, %ecx
+	//leaq	tr_apic_to_cpu_num(%rip), %rbx
+	movl	$pa_tr_apic_to_cpu_num, %ebx
+
+1:
+	cmp	(%ebx, %ecx, 2), %ebx	
+	je	1f
+	inc	%ecx
+	cmp	$NR_CPUS, %ecx	
+	jne	1b
+	// Here, if we were in coreboot, there would be a fallback stack. We do not need it since our 
+	// "fallback" is always provided in init.c by setting default stack size, and first then in the driver
+	// we swap that value with the stack size provided by coreboot.
+	jmp	align_stack
+1:
+	movl	$pa_tr_stack_size, %eax
+	mul	%ecx
+	movl	$pa_tr_stack_top, %ebx
+	subl	%eax, %ebx
+	mov	%ebx, %esp
+
+	movl	$pa_tr_stack_size, %eax
+	subl	%eax, %ebx
+	movl	$0, (%ebx)
+
+align_stack:
+	// here I am not sure whether this makes any sense, but well:
+	mov	%ecx, %edi
+	mov	%edi, %ecx
+
+	push	%rbx
+	push	%rcx
+
+	// lets first check if we even get so far
+	//rsm
+
+	mov	%rsp, %rdi
+	//callq	*tr_smm_start(%rip)
+	movq    pa_tr_smm_start(%rip), %rax
+	callq	*%rax
+
 	rsm
-	jmpq *tr_smm_start(%rip)
+
+	//callq *tr_smm_start(%rip)
+	//rsm
+	//jmpq *tr_smm_start(%rip)
 SYM_CODE_END(startup_64_smm)
 
 SYM_CODE_START(trampoline_start64)
@@ -484,6 +566,9 @@ SYM_DATA_START(trampoline_header)
 	SYM_DATA(tr_flags,		.space 4)
 	SYM_DATA(tr_lock,		.space 4)
 	SYM_DATA(tr_smm_start,		.space 8)
+	SYM_DATA(tr_stack_size,		.space 4)
+	SYM_DATA(tr_stack_top,		.space 4)
+	SYM_DATA(tr_apic_to_cpu_num,	.space 2)
 SYM_DATA_END(trampoline_header)
 
 #include "trampoline_common.S"

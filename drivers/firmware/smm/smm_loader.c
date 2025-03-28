@@ -14,6 +14,7 @@
 #include <asm/apic.h>
 #include <linux/spinlock.h>
 #include <linux/smp.h>
+#include <asm/realmode.h>
 
 #include "smm.h"
 
@@ -115,6 +116,8 @@ static int setup_stack(struct smm_data *data)
 	
 	stack_top = data->smram.descriptor[0].physical_start + total_stack_size;
 	global_stack_size = stack_size;
+	printk(KERN_INFO "stack top 0x%x", stack_top);
+	printk(KERN_INFO "stack size 0x%zx", global_stack_size);
 	return 0;
 
 }
@@ -128,7 +131,7 @@ static int setup_stack(struct smm_data *data)
 /*}*/
 
 //extern struct stub_data stub_entry_params;
-extern u32 smm_relocation_start;
+extern u32 smm_relocation;
 //extern uint8_t smm_relocation_end;
 
 static int load_trampoline(uintptr_t location)
@@ -142,10 +145,10 @@ static int load_trampoline(uintptr_t location)
 
 	// debug prints remove
 	printk(KERN_INFO "virt 0x%lx\n", addr);
-	printk(KERN_INFO "src 0x%lx\n", &smm_relocation_start);
+	printk(KERN_INFO "src 0x%lx\n", &smm_relocation);
 	// ...till here	
 
-	memcpy_toio(addr, &smm_relocation_start, 47);
+	memcpy_toio(addr, &smm_relocation, 47);
 
 	// memcpy the address from
 	wbinvd();
@@ -288,8 +291,22 @@ static int __init smm_loader_init(void)
 	const uintptr_t stub_location = SMM_DEFAULT_SMBASE + SMM_ENTRY_OFFSET;
 
 	//load_trampoline(stub_location);
+	//
+	printk(KERN_INFO "just testing 0x%llx", trampoline_header->smm_start);
+	int y;
+	y = setup_stack(&cb_data);
+	
+	
+	int i;
 
-	initiate_relocation();
+	for_each_online_cpu(i) {
+		trampoline_header->apic_to_cpu_num[i] = per_cpu(x86_cpu_to_apicid, i);
+		printk(KERN_INFO "cpu %d, apic id %d", i, trampoline_header->apic_to_cpu_num[i]);
+	}
+
+
+
+	//initiate_relocation();
 	// for testing, lets see what happens
 	/*unsigned long flags;*/
 	/**/

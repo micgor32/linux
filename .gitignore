@@ -57,6 +57,8 @@ dtbs-list
 modules.order
 
 uroot.sh
+full.sh
+/ldtest
 
 #
 # Top-level generic files

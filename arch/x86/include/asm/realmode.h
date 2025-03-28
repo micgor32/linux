@@ -83,6 +83,9 @@ struct trampoline_header {
 	u32 flags;
 	u32 lock;
 	u64 smm_start;
+	u32 stack_size;
+	u32 stack_top;
+	u16 apic_to_cpu_num[CONFIG_NR_CPUS]; // weeeell as mentioned in smm.h this is not good approach
 #endif
 };
 
@@ -134,6 +137,7 @@ extern unsigned char secondary_startup_64[];
 extern unsigned char secondary_startup_64_no_verify[];
 extern unsigned char smm_startup_64[];
 #endif
+extern struct trampoline_header *trampoline_header; // an idea: expose the header so that we can modify the params later in the driver
 
 static inline size_t real_mode_size_needed(void)
 {

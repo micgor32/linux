@@ -127,7 +127,7 @@ void smm_test(void)
 	early_printk("wont work anyways\n");
 }
 
-void notrace test_p(void)
+asmlinkage void test_p(void *arg)
 {
 	asm volatile (
         "movw $0x3f8, %%dx\n\t"
@@ -143,12 +143,14 @@ void notrace test_p(void)
         "outb %%al, %%dx\n\t"
         "movb $'\n', %%al\n\t"
         "outb %%al, %%dx\n\t"
+	"rsm\n\t"
         :
         :
         : "al", "dx"
 	);
 }
 
+struct trampoline_header *trampoline_header;
 static void __init setup_real_mode(void)
 {
 	u16 real_mode_seg;
@@ -156,7 +158,7 @@ static void __init setup_real_mode(void)
 	u32 count;
 	unsigned char *base;
 	unsigned long phys_base;
-	struct trampoline_header *trampoline_header;
+	//struct trampoline_header *trampoline_header;
 	size_t size = PAGE_ALIGN(real_mode_blob_end - real_mode_blob);
 #ifdef CONFIG_X86_64
 	u64 *trampoline_pgd;
@@ -212,7 +214,7 @@ static void __init setup_real_mode(void)
 	/*void __iomem *addr = ioremap((resource_size_t)location, 47); // hardcode size, beautiful*/
 	/*memcpy_toio(addr, &blob, 47);*/
 	/*wbinvd();*/
-	test_p();
+	//test_p();
 	printk("reloc code should be under 0x38000 (I think), the address is 0x%lx\n", (unsigned long)__va(real_mode_header->smm_relocation_start));
 
 #ifdef CONFIG_X86_32
@@ -231,6 +233,12 @@ static void __init setup_real_mode(void)
 	trampoline_header->smm_start = (u64) test_p; //smm_startup_64;
 	trampoline_cr4_features = &trampoline_header->cr4;
 	*trampoline_cr4_features = mmu_cr4_features;
+
+	printk("early testing 0x%llx", trampoline_header->smm_start);
+
+	// okay now the params, lets already start htinking about how to do that from the driver
+	trampoline_header->stack_size = 0xc000;
+	trampoline_header->stack_top = 0x7f80c000;
 
 	trampoline_header->flags = 0;
 
