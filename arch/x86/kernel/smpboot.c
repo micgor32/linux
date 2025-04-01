@@ -235,6 +235,26 @@ static void ap_calibrate_delay(void)
 static void notrace test_p(void *unused)
 {
 	//panic("Your code is obviously NOT CLEAR!\n");
+	asm volatile (
+        "movw $0x3f8, %%dx\n\t"
+        "movb $'t', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'e', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'s', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'t', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'o', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'\n', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+	"rsm\n\t"
+        :
+        :
+        : "al", "dx"
+	);
+
 }
 
 /*
@@ -247,6 +267,25 @@ static void notrace __noendbr start_secondary(void *unused)
 	 * before cpu_init(), SMP booting is too fragile that we want to
 	 * limit the things done here to the most necessary things.
 	 */
+	asm volatile (
+        "movw $0x3f8, %%dx\n\t"
+        "movb $'t', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'e', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'s', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'t', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'o', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'\n', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        :
+        :
+        : "al", "dx"
+	);
+
 	cr4_init();
 
 	/*
@@ -865,11 +904,7 @@ static int do_boot_cpu(u32 apicid, int cpu, struct task_struct *idle)
 #endif
 	idle->thread.sp = (unsigned long)task_pt_regs(idle);
 	initial_code = (unsigned long)start_secondary;
-	// just testing
-	ending_code = (unsigned long)test_p;
-
-	pr_info("ending_code is pointing to 0x%lx", ending_code);
-
+	
 	if (IS_ENABLED(CONFIG_X86_32)) {
 		early_gdt_descr.address = (unsigned long)get_cpu_gdt_rw(cpu);
 		initial_stack  = idle->thread.sp;

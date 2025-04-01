@@ -32,21 +32,7 @@
 #include <asm/segment.h>
 #include <asm/processor-flags.h>
 #include <asm/realmode.h>
-// these imports are becaouse of the section from head_64.S, some may not be needed but idc at the time
-#include <linux/pgtable.h>
-#include <linux/threads.h>
-#include <linux/export.h>
-#include <linux/pgtable.h>
-#include <asm/cache.h>
-#include <asm/processor-flags.h>
-#include <asm/percpu.h>
-#include <asm/nops.h>
-#include "../../entry/calling.h"
-#include <asm/nospec-branch.h>
-#include <asm/apicdef.h>
-#include <asm/fixmap.h>
-#include <asm/smp.h>
-#include <asm/thread_info.h>
+
 #include "realmode.h"
 
 	.text
@@ -114,88 +100,6 @@ no_longmode:
 	hlt
 	jmp no_longmode
 SYM_CODE_END(trampoline_start)
-
-// remove later huge redundancy
-	.balign	PAGE_SIZE
-SYM_CODE_START(smm_trampoline_start)
-	cli			# We should be safe anyway
-	wbinvd
-
-	LJMPW_RM(1f)
-1:
-	mov	%cs, %ax	# Code and data in the same place
-	mov	%ax, %ds
-	mov	%ax, %es
-	mov	%ax, %ss
-
-	LOCK_AND_LOAD_REALMODE_ESP
-
-	call	verify_cpu		# Verify the cpu supports long mode
-	testl   %eax, %eax		# Check for return code
-	jnz	no_longmode_smm
-
-.Lswitch_smm_to_protected:
-	/*
-	 * GDT tables in non default location kernel can be beyond 16MB and
-	 * lgdt will not be able to load the address as in real mode default
-	 * operand size is 16bit. Use lgdtl instead to force operand size
-	 * to 32 bit.
-	 */
-
-	lidtl	tr_idt	# load idt with 0, 0
-	lgdtl	tr_gdt	# load gdt with whatever is appropriate
-
-	movw	$__KERNEL_DS, %dx	# Data segment descriptor
-
-	# Enable protected mode
-	movl	$(CR0_STATE & ~X86_CR0_PG), %eax
-	movl	%eax, %cr0		# into protected mode
-	//rsm
-
-	# flush prefetch and jump to startup_32
-	ljmpl	$__KERNEL32_CS, $pa_smm_startup_32
-
-no_longmode_smm:
-	hlt
-	jmp no_longmode_smm
-SYM_CODE_END(smm_trampoline_start)
-// till here
-
-// we MAY not need this 
-SYM_CODE_START(smm_relocation_start)
-	mov	$0x3f8, %dx
-	mov	$'C', %al
-	out	%al, (%dx)
-	mov	$'r', %al
-	out	%al, (%dx)
-	mov	$'a', %al
-	out	%al, (%dx)
-	mov	$'s', %al
-	out	%al, (%dx)
-	mov	$'h', %al
-	out	%al, (%dx)
-	mov	$'h', %al
-	out	%al, (%dx)
-	jmp	fck
-
-fck:
-	mov	$0x3f8, %dx
-	mov	$'C', %al
-	out	%al, (%dx)
-	mov	$'r', %al
-	out	%al, (%dx)
-	mov	$'a', %al
-	out	%al, (%dx)
-	mov	$'s', %al
-	out	%al, (%dx)
-	mov	$'h', %al
-	out	%al, (%dx)
-	mov	$'h', %al
-	out	%al, (%dx)
-
-	rsm
-// maybe add here "old styled" symbol to indicate end of the section to be copied (for size calc).
-SYM_CODE_END(smm_relocation_start)
 
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 /* SEV-ES supports non-zero IP for entry points - no alignment needed */
@@ -289,78 +193,6 @@ SYM_CODE_START(startup_32)
 	ljmpl	$__KERNEL_CS, $pa_startup_64
 SYM_CODE_END(startup_32)
 
-// another redundant piece of code to be removed later
-.balign 4
-SYM_CODE_START(smm_startup_32)
-	movl	%edx, %ss
-	addl	$pa_real_mode_base, %esp
-	movl	%edx, %ds
-	movl	%edx, %es
-	movl	%edx, %fs
-	movl	%edx, %gs
-
-	/*
-	 * Check for memory encryption support. This is a safety net in
-	 * case BIOS hasn't done the necessary step of setting the bit in
-	 * the MSR for this AP. If SME is active and we've gotten this far
-	 * then it is safe for us to set the MSR bit and continue. If we
-	 * don't we'll eventually crash trying to execute encrypted
-	 * instructions.
-	 */
-	btl	$TH_FLAGS_SME_ACTIVE_BIT, pa_tr_flags
-	jnc	.Ldonesmm
-	movl	$MSR_AMD64_SYSCFG, %ecx
-	rdmsr
-	bts	$MSR_AMD64_SYSCFG_MEM_ENCRYPT_BIT, %eax
-	jc	.Ldonesmm
-
-	/*
-	 * Memory encryption is enabled but the SME enable bit for this
-	 * CPU has has not been set.  It is safe to set it, so do so.
-	 */
-	wrmsr
-.Ldonesmm:
-
-	movl	pa_tr_cr4, %eax
-	movl	%eax, %cr4		# Enable PAE mode
-
-	# Setup trampoline 4 level pagetables
-	movl	$pa_trampoline_pgd, %eax
-	movl	%eax, %cr3
-
-	# Set up EFER
-	movl	$MSR_EFER, %ecx
-	rdmsr
-	/*
-	 * Skip writing to EFER if the register already has desired
-	 * value (to avoid #VE for the TDX guest).
-	 */
-	cmp	pa_tr_efer, %eax
-	jne	.Lwrite_efersmm
-	cmp	pa_tr_efer + 4, %edx
-	je	.Ldone_efersmm
-.Lwrite_efersmm:
-	movl	pa_tr_efer, %eax
-	movl	pa_tr_efer + 4, %edx
-	wrmsr
-
-.Ldone_efersmm:
-	# Enable paging and in turn activate Long Mode.
-	movl	$CR0_STATE, %eax
-	movl	%eax, %cr0
-
-	/*
-	 * At this point we're in long mode but in 32bit compatibility mode
-	 * with EFER.LME = 1, CS.L = 0, CS.D = 1 (and in turn
-	 * EFER.LMA = 1). Now we want to jump in 64bit mode, to do that we use
-	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
-	 */
-
-	// change to jump to the stuff from this file
-	ljmpl	$__KERNEL_CS, $pa_startup_64_smm
-SYM_CODE_END(smm_startup_32)
-// till here
-
 SYM_CODE_START(pa_trampoline_compat)
 	/*
 	 * In compatibility mode.  Prep ESP and DX for startup_32, then disable
@@ -379,113 +211,8 @@ SYM_CODE_END(pa_trampoline_compat)
 	.balign 4
 SYM_CODE_START(startup_64)
 	# Now jump into the kernel using virtual addresses
-	// we need the logic here to either jump to the kernel on normal boot
-	// or to the tr_smm_start which will eventually call the handler (see smpboot.c L229).
-	// but for now we just duplicate the functions (amazing practice).
 	jmpq *tr_start(%rip)
 SYM_CODE_END(startup_64)
-
-	.balign 4
-SYM_CODE_START(startup_64_smm) // should be also removed later
-	mov	$0x3f8, %dx
-	mov	$'s', %al
-	out	%al, (%dx)
-	mov	$'t', %al
-	out	%al, (%dx)
-	mov	$'a', %al
-	out	%al, (%dx)
-	mov	$'r', %al
-	out	%al, (%dx)
-	mov	$'t', %al
-	out	%al, (%dx)
-	mov	$'p', %al
-	out	%al, (%dx)
-
-.Lread_apicid:
-	/* Check whether X2APIC mode is already enabled */
-	mov	$MSR_IA32_APICBASE, %ecx
-	rdmsr
-	testl	$X2APIC_ENABLE, %eax
-	jnz	.Lread_apicid_msr
-
-#ifdef CONFIG_X86_X2APIC
-	/*
-	 * If system is in X2APIC mode then MMIO base might not be
-	 * mapped causing the MMIO read below to fault. Faults can't
-	 * be handled at that point.
-	 */
-	cmpl	$0, x2apic_mode(%rip)
-	jz	.Lread_apicid_mmio
-
-	/* Force the AP into X2APIC mode. */
-	orl	$X2APIC_ENABLE, %eax
-	wrmsr
-	jmp	.Lread_apicid_msr
-#endif
-
-
-.Lread_apicid_mmio:
-	/* Read the APIC ID from the fix-mapped MMIO space. */
-	//movq	apic_mmio_base(%rip), %rcx
-	//addq	$APIC_ID, %rcx
-	movl	$1, %eax		//(%rcx), %eax
-	cpuid
-	shr	$24, %eax
-	jmp	.Lapicid_end
-
-.Lread_apicid_msr:
-	mov	$APIC_X2APIC_ID_MSR, %ecx
-	rdmsr
-
-.Lapicid_end:
-	/* EAX contains the APIC ID of the current CPU */
-	xorl	%ecx, %ecx
-	//leaq	tr_apic_to_cpu_num(%rip), %rbx
-	movl	$pa_tr_apic_to_cpu_num, %ebx
-
-1:
-	cmp	(%ebx, %ecx, 2), %ebx	
-	je	1f
-	inc	%ecx
-	cmp	$NR_CPUS, %ecx	
-	jne	1b
-	// Here, if we were in coreboot, there would be a fallback stack. We do not need it since our 
-	// "fallback" is always provided in init.c by setting default stack size, and first then in the driver
-	// we swap that value with the stack size provided by coreboot.
-	jmp	align_stack
-1:
-	movl	$pa_tr_stack_size, %eax
-	mul	%ecx
-	movl	$pa_tr_stack_top, %ebx
-	subl	%eax, %ebx
-	mov	%ebx, %esp
-
-	movl	$pa_tr_stack_size, %eax
-	subl	%eax, %ebx
-	movl	$0, (%ebx)
-
-align_stack:
-	// here I am not sure whether this makes any sense, but well:
-	mov	%ecx, %edi
-	mov	%edi, %ecx
-
-	push	%rbx
-	push	%rcx
-
-	// lets first check if we even get so far
-	//rsm
-
-	mov	%rsp, %rdi
-	//callq	*tr_smm_start(%rip)
-	movq    pa_tr_smm_start(%rip), %rax
-	callq	*%rax
-
-	rsm
-
-	//callq *tr_smm_start(%rip)
-	//rsm
-	//jmpq *tr_smm_start(%rip)
-SYM_CODE_END(startup_64_smm)
 
 SYM_CODE_START(trampoline_start64)
 	/*
@@ -565,10 +292,9 @@ SYM_DATA_START(trampoline_header)
 	SYM_DATA(tr_cr4,		.space 4)
 	SYM_DATA(tr_flags,		.space 4)
 	SYM_DATA(tr_lock,		.space 4)
-	SYM_DATA(tr_smm_start,		.space 8)
 	SYM_DATA(tr_stack_size,		.space 4)
 	SYM_DATA(tr_stack_top,		.space 4)
 	SYM_DATA(tr_apic_to_cpu_num,	.space 2)
 SYM_DATA_END(trampoline_header)
-
+	
 #include "trampoline_common.S"

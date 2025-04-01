@@ -17,11 +17,9 @@
 SYM_DATA_START(real_mode_header)
 	.long	pa_text_start
 	.long	pa_ro_end
-	/* SMP trampoline */
+	/* SMP and SMM trampolines */
 	.long	pa_trampoline_start
 	.long	pa_trampoline_header
-	.long	pa_smm_trampoline_start
-	.long	pa_smm_relocation_start
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	.long	pa_sev_es_trampoline_start
 #endif

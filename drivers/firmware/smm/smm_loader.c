@@ -122,6 +122,38 @@ static int setup_stack(struct smm_data *data)
 
 }
 
+static void notrace do_relocation(void *unused) {
+
+	asm volatile (
+        "movw $0x3f8, %%dx\n\t"
+        "movb $'i', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'m', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $' ', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'i', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'n', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+	"movb $' ', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+	"movb $'s', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+	"movb $'m', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+	"movb $'m', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+        "movb $'\n', %%al\n\t"
+        "outb %%al, %%dx\n\t"
+	"rsm\n\t"
+        :
+        :
+        : "al", "dx"
+	);
+}
+
+
 /*static int load_initial_stub(uintptr_t loc, void *start)*/
 /*{*/
 /*	// again, placeholder*/
@@ -292,7 +324,6 @@ static int __init smm_loader_init(void)
 
 	//load_trampoline(stub_location);
 	//
-	printk(KERN_INFO "just testing 0x%llx", trampoline_header->smm_start);
 	int y;
 	y = setup_stack(&cb_data);
 	
@@ -304,7 +335,10 @@ static int __init smm_loader_init(void)
 		printk(KERN_INFO "cpu %d, apic id %d", i, trampoline_header->apic_to_cpu_num[i]);
 	}
 
-
+	printk(KERN_INFO "the flag is 0x%x", is_for_smm);
+	is_for_smm = SMM_INIT_HANDLER;
+	printk(KERN_INFO "and now 0x%x", is_for_smm);
+	ending_code = (unsigned long)do_relocation;
 
 	//initiate_relocation();
 	// for testing, lets see what happens
