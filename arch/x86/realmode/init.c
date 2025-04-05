@@ -140,11 +140,19 @@ static void __init setup_real_mode(void)
 		__va(real_mode_header->trampoline_header);
 
 	// bound with config
+#ifdef CONFIG_SMM_DRIVER
 	/* Copying trampoline code to SMBASE */
 	const uintptr_t location = 0x38000;
 	void *v;
 	v = phys_to_virt(location);
 	memcpy(v, __va(real_mode_header->trampoline_start), 175); // see whether we can align size dynamically.
+	//memcpy(v, __va(real_mode_header->debug), 2);
+	// This has to be set to 0 for the normal boot.
+	// In case of reusing the trampoline for SMM init,
+	// this value will be overwritten by the driver.
+	is_for_smm = 0;
+	printk("is for smm? 0x%x", is_for_smm);
+#endif 
 
 #ifdef CONFIG_X86_32
 	trampoline_header->start = __pa_symbol(startup_32_smp);
@@ -164,7 +172,7 @@ static void __init setup_real_mode(void)
 	// This has to be set to 0 for the normal boot.
 	// In case of reusing the trampoline for SMM init,
 	// this value will be overwritten by the driver.
-	is_for_smm = 0x00000000;
+	is_for_smm = 0;
 	printk("is for smm? 0x%x", is_for_smm);
 	
 	trampoline_cr4_features = &trampoline_header->cr4;

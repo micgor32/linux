@@ -1,10 +1,10 @@
-# SPDX-License-Identifier: GPL-2.0
-obj-y += smram.o
-obj-y += smm_registers.o
-obj-y += spi_info.o
-obj-y += s3_comm.o
+#SPDX-License-Identifier: GPL-2.0
+# obj-y += smram.o
+# obj-y += smm_registers.o
+# obj-y += spi_info.o
+# obj-y += s3_comm.o
 obj-y += smm_loader.o
-obj-y += trampoline.o
+# obj-y += trampoline.o
 
 #obj-y += smm_loader.o commented out for now, uncomment for full build
 # This is for testing purposes

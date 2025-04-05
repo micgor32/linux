@@ -227,37 +227,6 @@ static void ap_calibrate_delay(void)
 }
 
 /*
- * This code is supposed to be the C handler used for SMM relocation.
- * For now its soley function is to panic the kernel (which I am not sure 
- * whether it will have any effect since we are not in the kernel anymore 
- * once this is executed).
- */
-static void notrace test_p(void *unused)
-{
-	//panic("Your code is obviously NOT CLEAR!\n");
-	asm volatile (
-        "movw $0x3f8, %%dx\n\t"
-        "movb $'t', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'e', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'s', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'t', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'o', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'\n', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-	"rsm\n\t"
-        :
-        :
-        : "al", "dx"
-	);
-
-}
-
-/*
  * Activate a secondary processor.
  */
 static void notrace __noendbr start_secondary(void *unused)
@@ -269,23 +238,19 @@ static void notrace __noendbr start_secondary(void *unused)
 	 */
 	asm volatile (
         "movw $0x3f8, %%dx\n\t"
-        "movb $'t', %%al\n\t"
+        "movb $'f', %%al\n\t"
         "outb %%al, %%dx\n\t"
-        "movb $'e', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'s', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'t', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'o', %%al\n\t"
+        "movb $'k', %%al\n\t"
         "outb %%al, %%dx\n\t"
         "movb $'\n', %%al\n\t"
         "outb %%al, %%dx\n\t"
+	//"rsm\n\t"
         :
         :
         : "al", "dx"
 	);
 
+	
 	cr4_init();
 
 	/*

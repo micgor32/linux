@@ -9,7 +9,7 @@
 #define TH_FLAGS_SME_ACTIVE_BIT		0
 #define TH_FLAGS_SME_ACTIVE		BIT(TH_FLAGS_SME_ACTIVE_BIT)
 
-#define SMM_INIT_HANDLER 0x10000000
+#define SMM_INIT_HANDLER 1
 
 #ifndef __ASSEMBLY__
 
@@ -23,6 +23,7 @@ struct real_mode_header {
 	/* SMP trampoline */
 	u32	trampoline_start;
 	u32	trampoline_header;
+	u32	debug;
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	u32	sev_es_trampoline_start;
 #endif

@@ -26,6 +26,7 @@ extern struct s3_comm_info *s3_info;
 /* Getter for CBTABLE entries exposed by dedicated parsers.
  * Should also free the memory allocated for the exposed structs.
  */
+ 
 static struct smm_data get_cb_data(void)
 {
 	// Sanity checks for null pointers (check whether for e.g. we are indeed running CB with SMM payload).
@@ -44,7 +45,7 @@ static struct smm_data get_cb_data(void)
 		.s3_info = *s3_info,
 		.cpu_count = cpu_count,
 	};
-	
+
 	// This is a placeholder for now, just dumping the values. To be cleaned up.
 	printk(KERN_INFO "the smram number of regions is %x\n",
 	       smram->nr_of_smm_regions);
@@ -122,34 +123,63 @@ static int setup_stack(struct smm_data *data)
 
 }
 
-static void notrace do_relocation(void *unused) {
+static void notrace do_relocation(void *unused) 
+{
 
+	/*asm volatile (*/
+	/*       "movw $0x3f8, %%dx\n\t"*/
+	/*       "movb $'i', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'m', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $' ', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'i', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'n', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $' ', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'s', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'m', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'m', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'\n', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "rsm\n\t"*/
+	/*       :*/
+	/*       :*/
+	/*       : "al", "dx"*/
+	/*);*/
+	pr_info("if everything went well, we are in smm, on cpu %d\n", smp_processor_id());
 	asm volatile (
-        "movw $0x3f8, %%dx\n\t"
-        "movb $'i', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'m', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $' ', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'i', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'n', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-	"movb $' ', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-	"movb $'s', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-	"movb $'m', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-	"movb $'m', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-        "movb $'\n', %%al\n\t"
-        "outb %%al, %%dx\n\t"
-	"rsm\n\t"
-        :
-        :
-        : "al", "dx"
+	       "movw $0x3f8, %%dx\n\t"
+	       "movb $'i', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $'m', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $' ', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $'i', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $'n', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $' ', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $'s', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $'m', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $'m', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "movb $'\n', %%al\n\t"
+	       "outb %%al, %%dx\n\t"
+	       "rsm\n\t"
+	       :
+	       :
+	       : "al", "dx"
 	);
 }
 
@@ -299,15 +329,9 @@ static int reloc_map(const uintptr_t smbase, const uint nr_cpus, const struct sm
 
 static int __init smm_loader_init(void)
 {
-	struct smm_data cb_data = get_cb_data();
+	//struct smm_data cb_data = get_cb_data();
 	
 	// read the state bit of smram regions to confirm its not locked, a sanity check to avoid nasty errors if we try to access regions that are somehow already locked (unlikely but still).
-	printk(KERN_INFO "sanity check");
-	for (int i = 0; i < cb_data.smram.nr_of_smm_regions; i++) {
-		// for now we will just print out the state value, idk what is the meaning of particular ones, i.e. which value means region is locked or not
-		printk(KERN_INFO "state 0x%llx", cb_data.smram.descriptor[i].region_state);
-	}
-
 	
 	/*if (load_reloc_handler(&cb_data)) {*/
 	/*	printk(KERN_ERR "loading reloc handler didnt worked");	*/
@@ -323,22 +347,35 @@ static int __init smm_loader_init(void)
 	const uintptr_t stub_location = SMM_DEFAULT_SMBASE + SMM_ENTRY_OFFSET;
 
 	//load_trampoline(stub_location);
+	//apic->send_IPI_allbutself(LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	//outb(0x00, 0xb2);
 	//
-	int y;
-	y = setup_stack(&cb_data);
+	//int y;
+	//y = setup_stack(&cb_data);
 	
+	printk(KERN_INFO "bsp %d", get_boot_cpu_id());
 	
-	int i;
+	/*int i;*/
+	/**/
+	/*for_each_online_cpu(i) {*/
+	/*	trampoline_header->apic_to_cpu_num[i] = per_cpu(x86_cpu_to_apicid, i);*/
+	/*	printk(KERN_INFO "cpu %d, apic id %d", i, trampoline_header->apic_to_cpu_num[i]);*/
+	/*}*/
 
-	for_each_online_cpu(i) {
-		trampoline_header->apic_to_cpu_num[i] = per_cpu(x86_cpu_to_apicid, i);
-		printk(KERN_INFO "cpu %d, apic id %d", i, trampoline_header->apic_to_cpu_num[i]);
-	}
-
-	printk(KERN_INFO "the flag is 0x%x", is_for_smm);
+	printk(KERN_INFO "the flag is %d", is_for_smm);
 	is_for_smm = SMM_INIT_HANDLER;
-	printk(KERN_INFO "and now 0x%x", is_for_smm);
+	printk(KERN_INFO "and now %d", is_for_smm);
 	ending_code = (unsigned long)do_relocation;
+
+	//__apic_send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+
+	//initiate_relocation();
+
+	/*for_each_online_cpu(i){*/
+	/*	if (!is_for_smm) */
+	/*		pr_info("not good");*/
+	/*}*/
+	
 
 	//initiate_relocation();
 	// for testing, lets see what happens

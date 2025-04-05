@@ -76,6 +76,8 @@ SYM_CODE_START(trampoline_start)
 	testl   %eax, %eax		# Check for return code
 	jnz	no_longmode
 
+
+
 .Lswitch_to_protected:
 	/*
 	 * GDT tables in non default location kernel can be beyond 16MB and
@@ -100,6 +102,10 @@ no_longmode:
 	hlt
 	jmp no_longmode
 SYM_CODE_END(trampoline_start)
+
+SYM_CODE_START(debug)
+	rsm
+SYM_CODE_END(debug)
 
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 /* SEV-ES supports non-zero IP for entry points - no alignment needed */
