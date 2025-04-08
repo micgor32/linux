@@ -16,12 +16,14 @@
 #include <linux/smp.h>
 #include <asm/realmode.h>
 
+#include <../../../arch/x86/kernel/apic/local.h>
 #include "smm.h"
 
 extern struct smram_info *smram;
 extern struct smm_registers_info *smm_regs;
 extern struct spi_flash_info *spi_info;
 extern struct s3_comm_info *s3_info;
+extern struct mm_info *mm_info;
 
 /* Getter for CBTABLE entries exposed by dedicated parsers.
  * Should also free the memory allocated for the exposed structs.
@@ -30,7 +32,7 @@ extern struct s3_comm_info *s3_info;
 static struct smm_data get_cb_data(void)
 {
 	// Sanity checks for null pointers (check whether for e.g. we are indeed running CB with SMM payload).
-	if (smram == NULL || smm_regs == NULL || spi_info == NULL || s3_info == NULL) {
+	if (smram == NULL || smm_regs == NULL || spi_info == NULL || s3_info == NULL || mm_info = NULL) {
 		struct smm_data dummy; // DO NOT LEAVE THIS HERE!!
 		return dummy;
 	}
@@ -43,6 +45,7 @@ static struct smm_data get_cb_data(void)
 		.registers = *smm_regs,
 		.spi_flash_info = *spi_info,
 		.s3_info = *s3_info,
+		.mm_info = *mm_info,
 		.cpu_count = cpu_count,
 	};
 
@@ -93,6 +96,7 @@ static struct smm_data get_cb_data(void)
 	kfree(smm_regs);
 	kfree(spi_info);
 	kfree(s3_info);
+	kfree(mm_info);
 
 	return ret;
 }
@@ -154,33 +158,33 @@ static void notrace do_relocation(void *unused)
 	/*       : "al", "dx"*/
 	/*);*/
 	pr_info("if everything went well, we are in smm, on cpu %d\n", smp_processor_id());
-	asm volatile (
-	       "movw $0x3f8, %%dx\n\t"
-	       "movb $'i', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $'m', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $' ', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $'i', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $'n', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $' ', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $'s', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $'m', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $'m', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "movb $'\n', %%al\n\t"
-	       "outb %%al, %%dx\n\t"
-	       "rsm\n\t"
-	       :
-	       :
-	       : "al", "dx"
-	);
+	/*asm volatile (*/
+	/*       "movw $0x3f8, %%dx\n\t"*/
+	/*       "movb $'i', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'m', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $' ', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'i', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'n', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $' ', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'s', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'m', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'m', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "movb $'\n', %%al\n\t"*/
+	/*       "outb %%al, %%dx\n\t"*/
+	/*       "rsm\n\t"*/
+	/*       :*/
+	/*       :*/
+	/*       : "al", "dx"*/
+	/*);*/
 }
 
 
@@ -331,8 +335,6 @@ static int __init smm_loader_init(void)
 {
 	//struct smm_data cb_data = get_cb_data();
 	
-	// read the state bit of smram regions to confirm its not locked, a sanity check to avoid nasty errors if we try to access regions that are somehow already locked (unlikely but still).
-	
 	/*if (load_reloc_handler(&cb_data)) {*/
 	/*	printk(KERN_ERR "loading reloc handler didnt worked");	*/
 	/*	return -1;*/
@@ -367,7 +369,13 @@ static int __init smm_loader_init(void)
 	printk(KERN_INFO "and now %d", is_for_smm);
 	ending_code = (unsigned long)do_relocation;
 
-	//__apic_send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	//default_send_IPI_single_phys(0, LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	//default_send_IPI_mask_sequence_phys(cpu_online_mask, LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	
+
+	printk("ttttttttttttttttt\n");
+
+	__apic_send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
 
 	//initiate_relocation();
 

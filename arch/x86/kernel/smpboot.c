@@ -707,6 +707,16 @@ static void send_init_sequence(u32 phys_apicid)
 	safe_apic_wait_icr_idle();
 }
 
+void send_smi(u32 phys_apicid, int vector) {
+	printk("imma here\n");
+	apic_icr_write(vector, phys_apicid);
+	unsigned long test = 0;
+	test = safe_apic_wait_icr_idle();
+	udelay(300);
+	if (test)
+		panic("NOT GOOD");
+}
+
 /*
  * Wake up AP by INIT, INIT, STARTUP sequence.
  */
@@ -735,14 +745,14 @@ static int wakeup_secondary_cpu_via_init(u32 phys_apicid, unsigned long start_ei
 	/*
 	 * Run STARTUP IPI loop.
 	 */
-	pr_debug("#startup loops: %d\n", num_starts);
+	pr_info("#startup loops: %d\n", num_starts);
 
 	for (j = 1; j <= num_starts; j++) {
-		pr_debug("Sending STARTUP #%d\n", j);
+		pr_info("Sending STARTUP #%d\n", j);
 		if (maxlvt > 3)		/* Due to the Pentium erratum 3AP.  */
 			apic_write(APIC_ESR, 0);
 		apic_read(APIC_ESR);
-		pr_debug("After apic_write\n");
+		pr_info("After apic_write\n");
 
 		/*
 		 * STARTUP IPI
@@ -762,9 +772,9 @@ static int wakeup_secondary_cpu_via_init(u32 phys_apicid, unsigned long start_ei
 		else
 			udelay(300);
 
-		pr_debug("Startup point 1\n");
+		pr_info("Startup point 1\n");
 
-		pr_debug("Waiting for send to finish...\n");
+		pr_info("Waiting for send to finish...\n");
 		send_status = safe_apic_wait_icr_idle();
 
 		/*
@@ -781,7 +791,7 @@ static int wakeup_secondary_cpu_via_init(u32 phys_apicid, unsigned long start_ei
 		if (send_status || accept_status)
 			break;
 	}
-	pr_debug("After Startup\n");
+	pr_info("After Startup\n");
 
 	if (send_status)
 		pr_err("APIC never delivered???\n");

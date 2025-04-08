@@ -355,6 +355,7 @@ extern struct apic *apic;
 	__section(".apicdrivers") = { &sym }
 
 extern struct apic *__apicdrivers[], *__apicdrivers_end[];
+extern void send_smi(u32 phys_apicid, int vector);
 
 /*
  * APIC functionality to boot other CPUs - only used on SMP:

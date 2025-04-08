@@ -22,6 +22,39 @@
 #define	LAPIC_INT_ASSERT 0x04000
 #define	LAPIC_DM_SMI 0x00200
 
+// testing
+
+#define APM_CNT		0xb2
+
+#define PM1_STS		0x00
+#define   PWRBTN_STS	(1 <<  8)
+#define   RTC_STS	(1 << 10)
+#define PM1_EN		0x02
+#define   PWRBTN_EN	(1 <<  8)
+#define   GBL_EN	(1 <<  5)
+#define PM1_CNT		0x04
+#define   SCI_EN	(1 << 0)
+#define PM_LV2		0x14
+#define PM_LV3		0x15
+#define PM_LV4		0x16
+#define PM_LV5		0x17
+#define PM_LV6		0x18
+#define GPE0_STS	0x20
+#define SMI_EN		0x30
+#define   PERIODIC_EN	(1 << 14)
+#define   TCO_EN	(1 << 13)
+#define   APMC_EN	(1 <<  5)
+#define   BIOS_EN	(1 <<  2)
+#define   EOS		(1 <<  1)
+#define   GBL_SMI_EN	(1 <<  0)
+#define SMI_STS		0x34
+#define ALT_GP_SMI_EN	0x38
+#define ALT_GP_SMI_STS	0x3a
+#define DEFAULT_PMBASE		0x00000600
+
+
+// end
+
 //static DEFINE_SPINLOCK(reloc_lock);
 //
 static void smi(int cpu, bool back)
@@ -43,7 +76,7 @@ static void ipi(void *inf)
 	int cpu = smp_processor_id();
 	pr_info("this is: %d", cpu);
 	printk(KERN_INFO "testssttst\n");
-	//apic->send_IPI_self(LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	apic->send_IPI(cpu, LAPIC_INT_ASSERT | LAPIC_DM_SMI);
 }
 
 static cpumask_var_t reloc_cpumask;
@@ -53,11 +86,10 @@ static void initiate_relocation(void)
 	//printk(KERN_INFO "boot_cpu is %d", get_boot_cpu_id());
 	//on_each_cpu(ipi, NULL, 1);
 	//on_each_cpu_cond_mask(NULL, ipi, NULL, true, cpu_online_mask); 
-	//apic->send_IPI(24, LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	//apic->send_IPI(0, LAPIC_INT_ASSERT | LAPIC_DM_SMI);
 	//apic->send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
-	outb(0x00, 0xb2);
-	int cpu;
-	unsigned long start;
+	/*int cpu;*/
+	/*unsigned long start;*/
 	/*cpus_read_lock();*/
 	/*cpumask_copy(reloc_cpumask, cpu_online_mask);*/
 	/*cpumask_clear_cpu(get_cpu(), reloc_cpumask);*/
@@ -84,10 +116,41 @@ static void initiate_relocation(void)
 	/**/
 	/*put_cpu();*/
 	/*cpus_read_unlock();*/
+	u32 smi_en = 0;
+	u16 pmbase = DEFAULT_PMBASE;
+
+	smi_en |= TCO_EN;
+	smi_en |= APMC_EN;
+	smi_en |= BIOS_EN;
+	smi_en |= EOS | GBL_SMI_EN;
+
+	outl(smi_en, pmbase + PM1_EN);
+	
+	outb(0x00, 0xb2);
+
+	int i;
+	/*for_each_cpu(i, cpu_online_mask) {*/
+	/*	printk("this is cpu %d", i);*/
+	/*	apic->send_IPI(i, LAPIC_INT_ASSERT | LAPIC_DM_SMI);*/
+	/*}*/
+	/*for_each_possible_cpu(i) {*/
+	/*	cpumask_set_cpu(i, reloc_cpumask);*/
+	/*}*/
+	//apic->default_send_IPI_single_phys(0, LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	/*cpumask_set_cpu(0, reloc_cpumask);*/
+	/*cpumask_set_cpu(1, reloc_cpumask);*/
+	/**/
+	/*if (cpumask_test_cpu(0, reloc_cpumask))*/
+	/*	printk("test");*/
+	/**/
+	/*int this; */
+	/*this = get_cpu();*/
+	/*//apic->send_IPI(this, LAPIC_INT_ASSERT | LAPIC_DM_SMI);*/
+	/*smp_call_function_many(reloc_cpumask, ipi, NULL, 1);*/
+	/*put_cpu();*/
 	printk(KERN_INFO "done");
 }
 
-	//outb(0x00, 0xb2);
 
 	//smi(smp_processor_id(), back);
 	//apic->send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
