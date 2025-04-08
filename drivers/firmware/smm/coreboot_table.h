@@ -113,6 +113,16 @@ struct lb_pld_s3_communication {
 	u8 pad[3];
 };
 
+#define CB_TAG_PLD_MM_INTERFACE_INFO 0x53
+struct lb_pld_mm_interface_info {
+	u32 tag;
+	u32 size;
+	u8 revision;
+	u8 requires_long_mode_call;
+	u8 register_mm_entry_swsmi;
+	u8 pad;
+};
+
 /* Describes framebuffer setup by coreboot */
 struct lb_framebuffer {
 	u32 tag;
@@ -145,6 +155,7 @@ struct coreboot_device {
 		struct lb_pld_smm_registers smm_registers;
 		struct lb_pld_spi_flash_info spi_info;
 		struct lb_pld_s3_communication s3_comm;
+		struct lb_pld_mm_interface_info mm_info;
 		DECLARE_FLEX_ARRAY(u8, raw);
 	};
 };

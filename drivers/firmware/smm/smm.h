@@ -88,34 +88,14 @@ struct smm_data {
 	struct smm_registers_info registers;
 	struct spi_flash_info spi_flash_info;
 	struct s3_comm_info s3_info; // wont be used for now
+	struct mm_info mm_info;
 	int cpu_count;
 };
 
-// we do not need this, remove later
-struct stub_data {
-	u32 stack_size;
-	u32 stack_top;
-	u32 c_handler; 
-	u32 cr3;
-	u16 apic_to_cpu_num[CONFIG_NR_CPUS]; // Medicore approach. It assumes the person builing the kernel wont put bigger number than they need, otherwise we just waste space.
-} __packed;
-
-// Based on coreboot's smm_relocation_params for intel
-struct reloc_params {
-	uintptr_t ied_base;
-	size_t ied_size;
-	struct msr smrr_base;
-	struct msr smrr_mask;
-	struct msr prmrr_base;
-	struct msr prmrr_mask;
-	struct msr uncore_prmrr_base;
-	struct msr uncore_prmrr_mask;
-	/*
-	 * The smm_save_state_in_msrs field indicates if SMM save state
-	 * locations live in MSRs. This indicates to the CPUs how to adjust
-	 * the SMMBASE and IEDBASE
-	 */
-	int smm_save_state_in_msrs;
+struct mm_info {
+	u8 revision;
+	u8 requires_long_mode_call;
+	u8 register_mm_entry_swsmi;
 };
 
 #endif
