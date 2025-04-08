@@ -21,8 +21,12 @@
 
 extern struct smram_info *smram;
 extern struct smm_registers_info *smm_regs;
+#ifdef SPI_SMM
 extern struct spi_flash_info *spi_info;
+#endif
+#ifdef S3_SUPPORT_SMM
 extern struct s3_comm_info *s3_info;
+#endif
 extern struct mm_info *mm_info;
 
 /* Getter for CBTABLE entries exposed by dedicated parsers.
@@ -32,19 +36,23 @@ extern struct mm_info *mm_info;
 static struct smm_data get_cb_data(void)
 {
 	// Sanity checks for null pointers (check whether for e.g. we are indeed running CB with SMM payload).
-	if (smram == NULL || smm_regs == NULL || spi_info == NULL || s3_info == NULL || mm_info = NULL) {
-		struct smm_data dummy; // DO NOT LEAVE THIS HERE!!
-		return dummy;
-	}
+	/*if (smram == NULL || smm_regs == NULL || spi_info == NULL || s3_info == NULL || mm_info = NULL) {*/
+	/*	struct smm_data dummy; // DO NOT LEAVE THIS HERE!!*/
+	/*	return dummy;*/
+	/*}*/
 
 	int cpu_count;
 	cpu_count = num_possible_cpus();
 
 	struct smm_data ret = {
 		.smram = *smram,
-		.registers = *smm_regs,
+		//.registers = *smm_regs,
+#ifdef SPI_SMM
 		.spi_flash_info = *spi_info,
+#endif
+#ifdef S3_SUPPORT_SMM
 		.s3_info = *s3_info,
+#endif
 		.mm_info = *mm_info,
 		.cpu_count = cpu_count,
 	};
@@ -60,42 +68,18 @@ static struct smm_data get_cb_data(void)
 		printk(KERN_INFO "state 0x%llx\n",
 		       smram->descriptor[i].region_state);
 	}
-	for (int i = 0; i < smm_regs->count; i++) {
-		printk(KERN_INFO "regs round %d", i);
-		printk(KERN_INFO "register id %d\n", smm_regs->registers[i].register_id);
-		printk(KERN_INFO "address_space_id %d\n",
-		       smm_regs->registers[i].address_space_id);
-		printk(KERN_INFO "register_bit_width %d\n",
-		       smm_regs->registers[i].register_bit_width);
-		printk(KERN_INFO "register_bit_width %d\n",
-		       smm_regs->registers[i].register_bit_offset);
-		printk(KERN_INFO "reg value 0x%x\n", smm_regs->registers[i].value);
-		printk(KERN_INFO "address 0x%x\n", smm_regs->registers[i].address);
-	}
-	printk(KERN_INFO "spi inf\n");
-	printk(KERN_INFO "0x%x\n", spi_info->revision);
-	printk(KERN_INFO "0x%x\n", spi_info->flags);
-	printk(KERN_INFO "0x%x\n", spi_info->spi_address.register_id);
-	printk(KERN_INFO "0x%x\n", spi_info->spi_address.address_space_id);
-	printk(KERN_INFO "0x%x\n", spi_info->spi_address.register_bit_width);
-	printk(KERN_INFO "0x%x\n", spi_info->spi_address.register_bit_offset);
-	printk(KERN_INFO "0x%x\n", spi_info->spi_address.value);
-	printk(KERN_INFO "0x%x\n", spi_info->spi_address.address);
-
-	printk(KERN_INFO "s3 info\n");
-	printk(KERN_INFO "start 0x%llx\n", s3_info->physical_start);
-	printk(KERN_INFO "size 0x%zx\n", (size_t)s3_info->physical_size);
-	printk(KERN_INFO "state 0x%llx\n", s3_info->region_state);
-	printk(KERN_INFO "acpi s3 enabled %d\n", s3_info->pld_acpi_s3_enable);
-
-	printk(KERN_INFO "cpu count: %d\n", cpu_count);
+	printk(KERN_INFO "mm entry 0x%x\n", mm_info->register_mm_entry_swsmi);
 	// end of statements to be cleaned up
 
 	// freeing the memory (also temp for now, see whether it makes sense here).
 	kfree(smram);
-	kfree(smm_regs);
+	//kfree(smm_regs);
+#ifdef SPI_SMM
 	kfree(spi_info);
+#endif
+#ifdef S3_SUPPORT_SMM
 	kfree(s3_info);
+#endif
 	kfree(mm_info);
 
 	return ret;
@@ -333,7 +317,7 @@ static int reloc_map(const uintptr_t smbase, const uint nr_cpus, const struct sm
 
 static int __init smm_loader_init(void)
 {
-	//struct smm_data cb_data = get_cb_data();
+	struct smm_data cb_data = get_cb_data();
 	
 	/*if (load_reloc_handler(&cb_data)) {*/
 	/*	printk(KERN_ERR "loading reloc handler didnt worked");	*/

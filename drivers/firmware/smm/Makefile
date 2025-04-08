@@ -1,8 +1,9 @@
 #SPDX-License-Identifier: GPL-2.0
-# obj-y += smram.o
-# obj-y += smm_registers.o
-# obj-y += spi_info.o
-# obj-y += s3_comm.o
+obj-y += smram.o
+obj-y += smm_registers.o
+obj-$(CONFIG_SPI_SMM) += spi_info.o
+obj-$(CONFIG_S3_SUPPORT_SMM) += s3_comm.o
+obj-y += mm_info.o
 obj-y += smm_loader.o
 # obj-y += trampoline.o
 

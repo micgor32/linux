@@ -26,7 +26,7 @@ static int mm_driver_probe(struct coreboot_device *dev)
 		return -ENXIO;
 	}
 
-	mm_info = kmalloc(sizeof(struct mm_info) + GFP_KERNEL);
+	mm_info = kmalloc(sizeof(struct mm_info), GFP_KERNEL);
 	mm_info->revision = mm_cbtable_info->revision;
 	mm_info->requires_long_mode_call = mm_cbtable_info->requires_long_mode_call;
 	mm_info->register_mm_entry_swsmi = mm_cbtable_info->register_mm_entry_swsmi;

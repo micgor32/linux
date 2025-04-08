@@ -28,6 +28,9 @@ static int smm_regs_driver_probe(struct coreboot_device *dev)
 		return -ENXIO;
 	}
 
+	if (smm_regs_cbtable_info->count == 0)
+		return -ENXIO;
+
 	smm_regs = kmalloc(sizeof(struct smm_registers_info) +
 				   sizeof(struct generic_register) *
 					   (smm_regs_cbtable_info->count - 1),

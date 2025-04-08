@@ -2,12 +2,23 @@
 
 if GOOGLE_FIRMWARE && GOOGLE_COREBOOT_TABLE
 
-config SMM_DRIVER
+menuconfig SMM_DRIVER
 	bool "SMM initialization (LinuxBootSMM)"
 	default n
 	help
 	  Enables driver for initializing System Management Mode (SMM).
 	  Only to be used when compiling as kernel for coreboot+LinuxBootSMM
 	  setup. If in doubt, say N.
+if SMM_DRIVER
+
+config SPI_SMM
+	bool "SPI store in SMM"
+	default n
+
+config S3_SUPPORT_SMM
+	bool "Enable payload-bootloader communication on S3 resume"
+	depends on ARCH_SUSPEND_POSSIBLE && SUSPEND
+	default n
+endif 
 
 endif
