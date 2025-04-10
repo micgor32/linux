@@ -11,6 +11,20 @@ menuconfig SMM_DRIVER
 	  setup. If in doubt, say N.
 if SMM_DRIVER
 
+config SMM_PAYLOAD
+	bool "Payload owns SMM (not working)"
+	default n
+	help
+	  This is NOT working, this config is left so that its easier for me to
+	  distinguish the code for testing purposes.
+
+config MM_PAYLOAD
+	bool "Payload MM"
+	default n
+	help
+	  coreboot owns SMM, Linux installs handler to the dedicated region and locks
+	  SMRAM.
+
 config SPI_SMM
 	bool "SPI store in SMM"
 	default n

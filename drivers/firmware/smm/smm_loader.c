@@ -359,7 +359,8 @@ static int __init smm_loader_init(void)
 
 	printk("ttttttttttttttttt\n");
 
-	__apic_send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	//__apic_send_IPI(smp_processor_id(), LAPIC_INT_ASSERT | LAPIC_DM_SMI);
+	//outb(0x00, 0xb2);
 
 	//initiate_relocation();
 

@@ -188,27 +188,6 @@ void __default_send_IPI_dest_field(unsigned int dest_mask, int vector,
 
 static unsigned int delay = UINT_MAX;
  
-static DEFINE_SPINLOCK(t_lock);
-
-void __default_send_IPI_dest_smi(unsigned int dest_mask, int vector,
-				   unsigned int dest_mode)
-{
-	/* See comment in __default_send_IPI_shortcut() */
-	/*if (unlikely(vector == NMI_VECTOR))*/
-	/*	apic_mem_wait_icr_idle_timeout();*/
-	/*else*/
-	/*	apic_mem_wait_icr_idle_timeout();*/
-	/**/
-	/*/* Set the IPI destination field in the ICR */
-	/*native_apic_mem_write(APIC_ICR2, __prepare_ICR2(dest_mask));*/
-	/*/* Send it with the proper destination mode */
-	/*native_apic_mem_write(APIC_ICR, __prepare_ICR(0, vector, dest_mode));*/
-
-	preempt_disable();
-	send_smi(dest_mask, vector);
-	preempt_enable();
-}
-
 void default_send_IPI_single_phys(int cpu, int vector)
 {
 	unsigned long flags;
@@ -224,16 +203,13 @@ void default_send_IPI_mask_sequence_phys(const struct cpumask *mask, int vector)
 	unsigned long flags;
 	unsigned long cpu;
 
-	///local_irq_save(flags);
+	local_irq_save(flags);
 	for_each_cpu(cpu, mask) {
-		spin_lock_irqsave(&t_lock, flags);
-		__default_send_IPI_dest_smi(per_cpu(x86_cpu_to_apicid,
+		__default_send_IPI_dest_field(per_cpu(x86_cpu_to_apicid,
 				cpu), vector, APIC_DEST_PHYSICAL);
-		spin_unlock_irqrestore(&t_lock, flags);
 	}
 
-	//local_irq_restore(flags);
-	printk("end of ipi");
+	local_irq_restore(flags);
 }
 
 void default_send_IPI_mask_allbutself_phys(const struct cpumask *mask,

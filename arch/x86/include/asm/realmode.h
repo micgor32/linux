@@ -24,6 +24,11 @@ struct real_mode_header {
 	u32	trampoline_start;
 	u32	trampoline_header;
 	u32	debug;
+	/* Needed only for MM payload */
+#ifdef CONFIG_MM_PAYLOAD
+	u32	startup_32;
+	u32	startup_64;
+#endif
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	u32	sev_es_trampoline_start;
 #endif
