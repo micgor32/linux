@@ -59,12 +59,12 @@ static int smram_driver_probe(struct coreboot_device *dev)
 	smram->smm_save_state_size = unpack_cbuint64(smram_cbtable_info->smm_save_state_size);
 	smram->cr3 = smram_cbtable_info->cr3;
 	// delete from here (just for testing)
-	printk(KERN_INFO "smram module");
-	printk(KERN_INFO "stack size 0x%x", smram->stack_size);
-	printk(KERN_INFO "smsize 0x%llx", smram->perm_smsize);
-	printk(KERN_INFO "smbase 0x%x", smram->perm_smbase);
-	printk(KERN_INFO "save state size 0x%llx", smram->smm_save_state_size);
-	printk(KERN_INFO "cr3 0x%x", smram->cr3);
+	/*printk(KERN_INFO "smram module");*/
+	/*printk(KERN_INFO "stack size 0x%x", smram->stack_size);*/
+	/*printk(KERN_INFO "smsize 0x%llx", smram->perm_smsize);*/
+	/*printk(KERN_INFO "smbase 0x%x", smram->perm_smbase);*/
+	/*printk(KERN_INFO "save state size 0x%llx", smram->smm_save_state_size);*/
+	/*printk(KERN_INFO "cr3 0x%x", smram->cr3);*/
 	// till here
 	for (int i = 0; i < smram->nr_of_smm_regions; i++) {
 		smram->descriptor[i].physical_start =
@@ -76,7 +76,7 @@ static int smram_driver_probe(struct coreboot_device *dev)
 		smram->descriptor[i].region_state =
 			unpack_cbuint64(smram_cbtable_info->descriptor[i].region_state);
 	}
-	printk(KERN_INFO "end smram mod");
+	//printk(KERN_INFO "end smram mod");
 
 	return 0;
 }
@@ -107,5 +107,5 @@ static struct coreboot_driver smram_driver = {
 module_coreboot_driver(smram_driver);
 
 MODULE_AUTHOR("Michal Gorlas <michal.gorlas@9elements.com>");
-MODULE_DESCRIPTION("Driver for exporting SMRAM information from coreboot table");
+MODULE_DESCRIPTION("Driver for exporting SMRAM information from the coreboot table");
 MODULE_LICENSE("GPL v2");

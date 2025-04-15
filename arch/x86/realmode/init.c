@@ -139,8 +139,8 @@ static void __init setup_real_mode(void)
 	trampoline_header = (struct trampoline_header *)
 		__va(real_mode_header->trampoline_header);
 
-	printk(KERN_INFO "startup64 paddress 0x%x", __pa(real_mode_header->startup_64));
-	printk(KERN_INFO "startup32 paddress 0x%x", __pa(real_mode_header->startup_32));
+	printk(KERN_INFO "startup64 paddress 0x%lx", __pa(real_mode_header->startup_64));
+	printk(KERN_INFO "startup32 paddress 0x%lx", __pa(real_mode_header->startup_32));
 
 	// bound with config
 #ifdef CONFIG_SMM_DRIVER

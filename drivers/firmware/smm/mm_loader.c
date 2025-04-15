@@ -11,11 +11,14 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
+#include <linux/delay.h>
 #include <asm/realmode.h>
 
 #include "smm.h"
 
 extern struct mm_info *mm_info;
+extern struct smram_info *smram;
+extern struct s3_comm_info *s3_info;
 
 /* Getter for CBTABLE entries exposed by dedicated parsers.
  * Should also free the memory allocated for the exposed structs.
@@ -23,23 +26,22 @@ extern struct mm_info *mm_info;
  
 static struct smm_data get_cb_data(void)
 {
-	// Sanity checks for null pointers (check whether for e.g. we are indeed running CB with SMM payload).
-	/*if (smram == NULL || smm_regs == NULL || spi_info == NULL || s3_info == NULL || mm_info = NULL) {*/
-	/*	struct smm_data dummy; // DO NOT LEAVE THIS HERE!!*/
-	/*	return dummy;*/
-	/*}*/
-	WARN_ON(mm_info == NULL);
+	WARN_ON(mm_info == NULL || smram == NULL || s3_info == NULL);
 
 	int cpu_count;
 	cpu_count = num_possible_cpus();
 
 	struct smm_data ret = {
 		.mm_info = *mm_info,
+		.smram = *smram,
+		.cpu_count = cpu_count,
+		.s3_info = *s3_info
 	};
 
-	// This is a placeholder for now, just dumping the values. To be cleaned up.
+	// just so that the parser devices can be unmounted
 	kfree(mm_info);
-	printk(KERN_INFO "requires long mode %d", ret.mm_info.requires_long_mode_call);
+	kfree(smram);
+	kfree(s3_info);
 
 	return ret;
 }
@@ -52,7 +54,6 @@ static int trigger_smi(uint64_t cmd, uint64_t arg, uint64_t retry){
 		"movq	%[cmd],  %%rax\n\t"
 		"movq   %%rax,	%%rcx\n\t"
 		"movq	%[arg],  %%rbx\n\t"
-		"movq	%%rbx,	 %%rdx\n\t"
 		"movq   %[retry],  %%r8\n\t"
 		".trigger:	  \n\t"
 		"mov	%[apmc_port], %%dx\n\t"
@@ -64,33 +65,29 @@ static int trigger_smi(uint64_t cmd, uint64_t arg, uint64_t retry){
 		"rep    nop\n\t"
 		"popq   %%rcx\n\t"
 		"cmpq   $0, %%r8\n\t"
-		"je     .return\n\t"
+		"je     .return_not_changed\n\t"
 		"decq   %%r8\n\t"
 		"jmp    .trigger\n\t"
-		".return:\n\t" // do nothing here otherwise we get an compiler warning
-		"jmp	.return_not_changed\n\t"
 		".return_changed:\n\t"
-		"movw $0x3f8, %%dx\n\t"
-		"movb $'3', %%al\n\t"
-	        "outb %%al, %%dx\n\t"
+		/*"movw $0x3f8, %%dx\n\t"*/ // debug dummy print
+		/*"movb $'3', %%al\n\t"*/
+		/*"outb %%al, %%dx\n\t"*/
 		"movq	%%rax, %[status]\n\t"
 		"jmp	.end\n\t"
 		".return_not_changed:"
-		"movw $0x3f8, %%dx\n\t"
-		"movb $'n', %%al\n\t"
-		"outb %%al, %%dx\n\t"
+		/*"movw $0x3f8, %%dx\n\t"*/ // s.a.
+		/*"movb $'n', %%al\n\t"*/
+		/*"outb %%al, %%dx\n\t"*/
 		"movq	%%rcx, %[status]\n\t"
 		".end:\n\t"
-		// this is getting out of control, these jumps are mostly unnecessary
 		: [status] "=r" (status)
 		: [cmd] "r" (cmd), [arg] "r" (arg), [retry] "r" (retry) , [apmc_port] "r" (apmc_port)
-		: "%rax", "%rbx", "%rdx", "%rcx", "%r8", "%al" , "%dx"
+		: "%rax", "%rbx", "%rdx", "%rcx", "%r8" //, "%al" , "%dx" // only if prints are outcommented
 	);
 
-	printk(KERN_INFO "SMI returned %llx", ((status >> 8) & 0xff));
+	printk(KERN_INFO "SMI returned %llx\n", status);//((status >> 8) & 0xff));
 	
 	if(status == cmd) {
-		printk(KERN_INFO "rax not modified by smm");
 		status = PAYLOAD_MM_RET_FAILURE;
 	} else
 		status = PAYLOAD_MM_RET_SUCCESS;
@@ -104,9 +101,8 @@ static int unlock_smram(struct smm_data *data)
 	uint8_t status;
 
 	cmd = data->mm_info.register_mm_entry_swsmi | (PAYLOAD_MM_UNLOCK_SMRAM << 8);
-	printk(KERN_INFO "cmd is 0x%llx\n", cmd);
-	printk(KERN_INFO "so it will be shifted to %x", ((cmd >> 8) & 0xff));
-	status = trigger_smi(cmd, 0, 5); // 5 here (and below) just because, why not repeat smi issuing 5 times :D 
+	printk(KERN_INFO, "we send to rax 0x%llx\n", cmd);
+	status = trigger_smi(cmd, 0, 5); 
 	return status;
 }
 
@@ -116,18 +112,16 @@ static int lock_smram(struct smm_data *data)
 	uint8_t status;
 
 	cmd = data->mm_info.register_mm_entry_swsmi | (PAYLOAD_MM_LOCK_SMRAM << 8);
-	printk(KERN_INFO "cmd is 0x%llx\n", cmd); // for debugging, remove later
 	status = trigger_smi(cmd, 0, 5);
 	return status;
 }
 
-static int register_entry_point(struct smm_data *data, uint32_t entry_point) // clarify whether this should be 64 address (I doubt)
+static int register_entry_point(struct smm_data *data, uint32_t entry_point)
 {
 	uint64_t cmd;
 	uint8_t status;
 
 	cmd = data->mm_info.register_mm_entry_swsmi | (PAYLOAD_MM_REGISTER_ENTRY << 8);
-	printk(KERN_INFO "cmd is 0x%llx\n", cmd);
 	status = trigger_smi(cmd, entry_point, 5);
 	return status;
 }
@@ -142,8 +136,15 @@ static int __init mm_loader_init(void)
 	struct smm_data cb_data = get_cb_data();
 	uint32_t entry_point;
 
-	if (unlock_smram(&cb_data))
-		return -1;
+	int status_unlock = 1;
+	status_unlock = unlock_smram(&cb_data); //register_entry_point(&cb_data, 0x7ff0000);	
+
+	mdelay(100);
+	printk(KERN_INFO "status is %d\n", status_unlock);
+
+	/*status_unlock = unlock_smram(&cb_data);*/
+	/**/
+	/*mdelay(10000);*/
 
 	// so now we can install the entry point
 	
@@ -153,18 +154,29 @@ static int __init mm_loader_init(void)
 	/*else*/
 	/*	entry_point = __pa(real_mode_header->startup_32);*/
 	/**/
-	/*printk(KERN_INFO "pa of entry point 0x%lx\n", entry_point);*/
-	/*is_for_smm = SMM_INIT_HANDLER;*/
-	/*ending_code = (unsigned long)test; // for now its just this dummy function, next step would be to place the functions needed here in smram*/
+	/*const uintptr_t location = cb_data.s3_info.physical_start;*/
+	/*void __iomem *addr = ioremap((resource_size_t)location, 47);*/
+	/*printk(KERN_INFO "tseg base is 0x%lx, and va 0x%lx\n", location, addr);*/
+	/**/
+	/**/
+	/*memcpy_toio(addr, __va(real_mode_header->debug), 6);*/
+	/*wbinvd();*/
+
+	int status_reg = 1;
+	status_reg = register_entry_point(&cb_data, cb_data.s3_info.physical_start);
+
+	mdelay(100);
+	printk(KERN_INFO "status is %d\n", status_reg);
+
+	int status_lock = 1;
+	status_lock = lock_smram(&cb_data);
+
+	mdelay(100);
+	printk(KERN_INFO "status is %d\n", status_lock);
+
+	//is_for_smm = SMM_INIT_HANDLER;
+	//ending_code = (unsigned long)test; // for now its just this dummy function, next step would be to place the functions needed here in smram*/
 	
-	// here comes smi registering entry point
-	/*if (register_entry_point(&cb_data, entry_point))*/
-	/*	return -1;*/
-
-	/*// assuming the handler is loaded \land the entry point is registered:*/
-	if (lock_smram(&cb_data))
-		return -1;
-
 	return 0;
 }
 

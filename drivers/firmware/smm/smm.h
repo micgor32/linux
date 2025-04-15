@@ -74,14 +74,12 @@ struct spi_flash_info {
 };
 #endif
 
-#ifdef S3_SUPPORT_SMM
 struct s3_comm_info {
 	u64 physical_start;
 	u64 physical_size;
 	u64 region_state;
 	u8 pld_acpi_s3_enable;
 };
-#endif
 
 struct smm_state {
 	int cpu_count;
@@ -100,13 +98,11 @@ struct mm_info {
 
 struct smm_data {
 	struct smram_info smram;
-	struct smm_registers_info registers;
 #ifdef SPI_SMM
+	struct smm_registers_info registers;
 	struct spi_flash_info spi_flash_info;
 #endif
-#ifdef S3_SUPPORT_SMM
 	struct s3_comm_info s3_info; // wont be used for now
-#endif
 	struct mm_info mm_info;
 	int cpu_count;
 };

@@ -104,7 +104,9 @@ no_longmode:
 SYM_CODE_END(trampoline_start)
 
 SYM_CODE_START(debug)
-	rsm
+	mov $0x3f8, %dx
+	mov $'t', %al
+	out %al, %dx
 SYM_CODE_END(debug)
 
 #ifdef CONFIG_AMD_MEM_ENCRYPT
