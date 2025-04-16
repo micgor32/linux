@@ -29,6 +29,7 @@ static int s3_communications_driver_probe(struct coreboot_device *dev)
 
 	s3_info = kmalloc(sizeof(struct s3_comm_info), GFP_KERNEL);
 	s3_info->physical_start = unpack_cbuint64(s3_cbtable_info->comm_buffer.physical_start);
+	printk(KERN_INFO "start com 0x%lx\n", s3_info->physical_start);
 	s3_info->pld_acpi_s3_enable = s3_cbtable_info->pld_acpi_s3_enable;
 	s3_info->physical_size = unpack_cbuint64(s3_cbtable_info->comm_buffer.physical_size);
 	s3_info->region_state = unpack_cbuint64(s3_cbtable_info->comm_buffer.region_state);

@@ -16,6 +16,8 @@
 
 #include "smm.h"
 
+#define DRIVER_NAME "mm_loader"
+
 extern struct mm_info *mm_info;
 extern struct smram_info *smram;
 extern struct s3_comm_info *s3_info;
@@ -33,10 +35,20 @@ static struct smm_data get_cb_data(void)
 
 	struct smm_data ret = {
 		.mm_info = *mm_info,
-		.smram = *smram,
+		.nr_of_smm_regions = smram->nr_of_smm_regions,
 		.cpu_count = cpu_count,
 		.s3_info = *s3_info
 	};
+
+	for (int i = 0; i < ret.nr_of_smm_regions; i++) {
+		ret.region[i].physical_start = smram->descriptor[i].physical_start;
+		ret.region[i].cpu_start = smram->descriptor[i].cpu_start;
+		ret.region[i].physical_size = smram->descriptor[i].physical_size;
+		ret.region[i].region_state = smram->descriptor[i].region_state;
+		printk(KERN_INFO "region %d start 0x%lx\n", i, ret.region[i].physical_start);
+
+	}
+
 
 	// just so that the parser devices can be unmounted
 	kfree(mm_info);
@@ -69,23 +81,34 @@ static int trigger_smi(uint64_t cmd, uint64_t arg, uint64_t retry){
 		"decq   %%r8\n\t"
 		"jmp    .trigger\n\t"
 		".return_changed:\n\t"
-		/*"movw $0x3f8, %%dx\n\t"*/ // debug dummy print
-		/*"movb $'3', %%al\n\t"*/
-		/*"outb %%al, %%dx\n\t"*/
+// the dummy prints to the console should not be compiled for normal run - writing directly
+// to serial can (and usually will) cause some issues. Useful for debugging tho.
+#ifdef CONFIG_DEBUG_KERNEL
+		"movw $0x3f8, %%dx\n\t"
+		"movb $'c', %%al\n\t"
+		"outb %%al, %%dx\n\t"
+		"movb $'\n', %%al\n\t"
+		"outb %%al, %%dx\n\t"
+#endif
 		"movq	%%rax, %[status]\n\t"
 		"jmp	.end\n\t"
 		".return_not_changed:"
-		/*"movw $0x3f8, %%dx\n\t"*/ // s.a.
-		/*"movb $'n', %%al\n\t"*/
-		/*"outb %%al, %%dx\n\t"*/
+#ifdef CONFIG_DEBUG_KERNEL
+		"movw $0x3f8, %%dx\n\t"
+		"movb $'n', %%al\n\t"
+		"outb %%al, %%dx\n\t"
+		"movb $'\n', %%al\n\t"
+		"outb %%al, %%dx\n\t"
+#endif
 		"movq	%%rcx, %[status]\n\t"
 		".end:\n\t"
 		: [status] "=r" (status)
 		: [cmd] "r" (cmd), [arg] "r" (arg), [retry] "r" (retry) , [apmc_port] "r" (apmc_port)
-		: "%rax", "%rbx", "%rdx", "%rcx", "%r8" //, "%al" , "%dx" // only if prints are outcommented
+		: "%rax", "%rbx", "%rdx", "%rcx", "%r8"
 	);
 
-	printk(KERN_INFO "SMI returned %llx\n", status);//((status >> 8) & 0xff));
+	// For debugging - it is useful to know what exact value was written to RAX by SMI handler.
+	printk(KERN_DEBUG "%s: SMI returned 0x%llx\n", __func__, ((status >> 8) & 0xff));
 	
 	if(status == cmd) {
 		status = PAYLOAD_MM_RET_FAILURE;
@@ -101,8 +124,9 @@ static int unlock_smram(struct smm_data *data)
 	uint8_t status;
 
 	cmd = data->mm_info.register_mm_entry_swsmi | (PAYLOAD_MM_UNLOCK_SMRAM << 8);
-	printk(KERN_INFO, "we send to rax 0x%llx\n", cmd);
 	status = trigger_smi(cmd, 0, 5); 
+	pr_info(DRIVER_NAME ": %s: SMI returned %llx\n", __func__);
+
 	return status;
 }
 
@@ -113,6 +137,8 @@ static int lock_smram(struct smm_data *data)
 
 	cmd = data->mm_info.register_mm_entry_swsmi | (PAYLOAD_MM_LOCK_SMRAM << 8);
 	status = trigger_smi(cmd, 0, 5);
+	pr_info(DRIVER_NAME ": %s: SMI returned %llx\n", __func__);
+
 	return status;
 }
 
@@ -123,6 +149,8 @@ static int register_entry_point(struct smm_data *data, uint32_t entry_point)
 
 	cmd = data->mm_info.register_mm_entry_swsmi | (PAYLOAD_MM_REGISTER_ENTRY << 8);
 	status = trigger_smi(cmd, entry_point, 5);
+	pr_info(DRIVER_NAME ": %s: SMI returned %llx\n", __func__);
+
 	return status;
 }
 
@@ -137,14 +165,10 @@ static int __init mm_loader_init(void)
 	uint32_t entry_point;
 
 	int status_unlock = 1;
-	status_unlock = unlock_smram(&cb_data); //register_entry_point(&cb_data, 0x7ff0000);	
+	status_unlock = unlock_smram(&cb_data);
 
 	mdelay(100);
-	printk(KERN_INFO "status is %d\n", status_unlock);
-
-	/*status_unlock = unlock_smram(&cb_data);*/
-	/**/
-	/*mdelay(10000);*/
+	printk(KERN_DEBUG "status is %d\n", status_unlock);
 
 	// so now we can install the entry point
 	
@@ -154,40 +178,50 @@ static int __init mm_loader_init(void)
 	/*else*/
 	/*	entry_point = __pa(real_mode_header->startup_32);*/
 	/**/
-	/*const uintptr_t location = cb_data.s3_info.physical_start;*/
-	/*void __iomem *addr = ioremap((resource_size_t)location, 47);*/
-	/*printk(KERN_INFO "tseg base is 0x%lx, and va 0x%lx\n", location, addr);*/
-	/**/
-	/**/
-	/*memcpy_toio(addr, __va(real_mode_header->debug), 6);*/
-	/*wbinvd();*/
+	const uintptr_t location = cb_data.region[1].physical_start; //cb_data.s3_info.physical_start;
+	void __iomem *addr = ioremap((resource_size_t)location, 47);
+	printk(KERN_DEBUG "payload handler is 0x%lx, and va\n", location, addr);
+	printk(KERN_DEBUG "region 1 start 0x%lx\n", cb_data.region[1].physical_start);
+	printk(KERN_DEBUG "region 0 is 0x%lx\n", cb_data.region[0].physical_start);
+	for (int i = 0; i < cb_data.nr_of_smm_regions; i++)
+		printk(KERN_DEBUG "region %d start 0x%lx\n", i, cb_data.region[i].physical_start);
+
+	/* There are two things we have to do before telling coreboot where the handler is:
+	 * - modify is_for_smm so that head_$(BITS) will point to the handler code instead
+	 *   of continuing with the boot procedure (we do NOT want that to be done). I.e.
+	 *   it will call ending_code.
+	 * - let ending_code point to the handler code (for now to the dummy func).
+	 */
+	is_for_smm = SMM_INIT_HANDLER;
+	ending_code = (unsigned long)test;
+
+	//memcpy_toio(addr, __va(real_mode_header->debug), 47);
+	//wbinvd();
 
 	int status_reg = 1;
-	status_reg = register_entry_point(&cb_data, cb_data.s3_info.physical_start);
+	status_reg = register_entry_point(&cb_data, cb_data.region[1].physical_start);
 
 	mdelay(100);
-	printk(KERN_INFO "status is %d\n", status_reg);
+	printk(KERN_DEBUG "status is %d\n", status_reg);
 
 	int status_lock = 1;
 	status_lock = lock_smram(&cb_data);
 
 	mdelay(100);
-	printk(KERN_INFO "status is %d\n", status_lock);
+	printk(KERN_DEBUG "status is %d\n", status_lock);
 
-	//is_for_smm = SMM_INIT_HANDLER;
-	//ending_code = (unsigned long)test; // for now its just this dummy function, next step would be to place the functions needed here in smram*/
-	
+		
 	return 0;
 }
 
 static void __exit mm_loader_exit(void)
 {
-	printk(KERN_INFO "DONE");
+	printk(KERN_DEBUG "DONE");
 }
 
 module_init(mm_loader_init);
 module_exit(mm_loader_exit);
 
 MODULE_AUTHOR("Michal Gorlas <michal.gorlas@9elements.com>");
-MODULE_DESCRIPTION("MM loader - installs payload owned SMI handler");
+MODULE_DESCRIPTION("MM loader - installs payload-owned SMI handler");
 MODULE_LICENSE("GPL v2");

@@ -58,12 +58,6 @@ struct smm_registers_info {
 struct smram_info {
 	u32 nr_of_smm_regions;
 	struct smram_descriptor descriptor[1];
-	u32 stack_size;
-	u64 perm_smsize; 
-	u32 perm_smbase;
-	u64 smm_save_state_size;
-	u32 cr3;
-
 };
 
 #ifdef SPI_SMM
@@ -97,7 +91,8 @@ struct mm_info {
 };
 
 struct smm_data {
-	struct smram_info smram;
+	u32 nr_of_smm_regions;
+	struct smram_descriptor region[1];
 #ifdef SPI_SMM
 	struct smm_registers_info registers;
 	struct spi_flash_info spi_flash_info;
