@@ -5,10 +5,6 @@
 #include <linux/cc_platform.h>
 #include <linux/pgtable.h>
 
-// for testing only
-#include <linux/kernel.h>
-// end
-
 #include <asm/set_memory.h>
 #include <asm/realmode.h>
 #include <asm/tlbflush.h>
@@ -90,6 +86,9 @@ static void __init sme_sev_setup_real_mode(struct trampoline_header *th)
 }
 
 struct trampoline_header *trampoline_header;
+#ifdef CONFIG_MM_PAYLOAD
+struct trampoline_header *mm_tram_header;
+#endif
 static void __init setup_real_mode(void)
 {
 	u16 real_mode_seg;
@@ -98,6 +97,7 @@ static void __init setup_real_mode(void)
 	unsigned char *base;
 	unsigned long phys_base;
 	size_t size = PAGE_ALIGN(real_mode_blob_end - real_mode_blob);
+	printk("size of the blob %zx\n", size);
 #ifdef CONFIG_X86_64
 	u64 *trampoline_pgd;
 	u64 efer;
@@ -117,6 +117,7 @@ static void __init setup_real_mode(void)
 	memcpy(base, real_mode_blob, size);
 
 	phys_base = __pa(base);
+	printk("phys base is 0x%lx", phys_base);
 	real_mode_seg = phys_base >> 4;
 
 	rel = (u32 *) real_mode_relocs;
@@ -138,25 +139,7 @@ static void __init setup_real_mode(void)
 	/* Must be performed *after* relocation. */
 	trampoline_header = (struct trampoline_header *)
 		__va(real_mode_header->trampoline_header);
-
-	printk(KERN_INFO "startup64 paddress 0x%lx", __pa(real_mode_header->startup_64));
-	printk(KERN_INFO "startup32 paddress 0x%lx", __pa(real_mode_header->startup_32));
-
-	// bound with config
-#ifdef CONFIG_SMM_DRIVER
-	/* Copying trampoline code to SMBASE */
-	const uintptr_t location = 0x7fff0; //0x38000;
-	void *v;
-	v = phys_to_virt(location);
-	//memcpy(v, __va(real_mode_header->trampoline_start), 175); // see whether we can align size dynamically.
-	//memcpy(v, __va(real_mode_header->debug), 2);
-	// This has to be set to 0 for the normal boot.
-	// In case of reusing the trampoline for SMM init,
-	// this value will be overwritten by the driver.
-	is_for_smm = 0;
-	printk("is for smm? 0x%x", is_for_smm);
-#endif 
-
+	
 #ifdef CONFIG_X86_32
 	trampoline_header->start = __pa_symbol(startup_32_smp);
 	trampoline_header->gdt_limit = __BOOT_DS + 7;
@@ -192,6 +175,37 @@ static void __init setup_real_mode(void)
 	 */
 	for (i = pgd_index(__PAGE_OFFSET); i < PTRS_PER_PGD; i++)
 		trampoline_pgd[i] = init_top_pgt[i].pgd;
+#endif
+
+#ifdef CONFIG_MM_PAYLOAD
+	u64 *mm_trampoline_pgd;
+	u32 *mm_tram_cr4_features;
+
+	mm_tram_header =  (struct trampoline_header *)
+		__va(real_mode_header->trampoline_header);
+	mm_tram_header->efer = efer & ~EFER_LMA;
+
+	mm_tram_header->start = (u64) secondary_startup_64;
+
+	mm_lock = &mm_tram_header->lock;
+	*mm_lock = 0;
+
+	mm_tram_cr4_features = trampoline_cr4_features;
+
+	mm_tram_header->flags = 0;
+
+	mm_trampoline_pgd = (u64 *) __va(real_mode_header->trampoline_pgd);
+	mm_trampoline_pgd[0] = trampoline_pgd_entry.pgd;
+
+	for (i = pgd_index(__PAGE_OFFSET); i < PTRS_PER_PGD; i++)
+		mm_trampoline_pgd[i] = init_top_pgt[i].pgd;
+
+	/* This has to be set to 0 for the normal boot.
+	 * In case of reusing the trampoline from SMM,
+	 * this value will be overwritten by the driver.
+	 */
+	
+	is_for_smm = 0;
 #endif
 
 	sme_sev_setup_real_mode(trampoline_header);
@@ -230,8 +244,6 @@ void __init init_real_mode(void)
 {
 	if (!real_mode_header)
 		panic("Real mode trampoline was not allocated");
-	/*if (!stub_header)*/
-	/*	panic("SMM stub trampoline was not allocated");*/
 
 	setup_real_mode();
 	set_real_mode_permissions();

@@ -12,7 +12,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
-#include "coreboot_table.h"
+#include "../google/coreboot_table.h"
 #include "smm.h"
 
 static struct lb_pld_mm_interface_info *mm_cbtable_info;

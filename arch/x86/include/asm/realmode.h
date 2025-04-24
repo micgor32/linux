@@ -26,8 +26,11 @@ struct real_mode_header {
 	u32	debug;
 	/* Needed only for MM payload */
 #ifdef CONFIG_MM_PAYLOAD
-	u32	startup_32;
-	u32	startup_64;
+	u32	mm_trampoline_start;
+	u32	mm_startup_32;
+	u32	mm_trampoline_header;
+	u32	mm_trampoline_start64;
+	u32	mm_trampoline_pgd;
 #endif
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	u32	sev_es_trampoline_start;
@@ -79,6 +82,7 @@ extern unsigned long initial_vc_handler;
 
 // for now lets reuse it for the stub (?)
 extern u32 *trampoline_lock;
+extern u32 *mm_lock;
 
 extern unsigned char real_mode_blob[];
 extern unsigned char real_mode_relocs[];

@@ -12,7 +12,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
-#include "coreboot_table.h"
+#include "../google/coreboot_table.h"
 #include "smm.h"
 
 static struct lb_pld_smram_descriptor_block *smram_cbtable_info;

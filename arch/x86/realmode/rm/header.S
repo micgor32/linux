@@ -22,8 +22,11 @@ SYM_DATA_START(real_mode_header)
 	.long	pa_trampoline_header
 	.long	pa_debug
 #ifdef CONFIG_MM_PAYLOAD
-	.long	pa_startup_32
-	.long	pa_startup_64
+	.long	pa_mm_trampoline_start
+	.long	pa_mm_startup_32
+	.long	pa_mm_trampoline_header
+	.long	pa_mm_trampoline_start64
+	.long	pa_mm_trampoline_pgd
 #endif
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	.long	pa_sev_es_trampoline_start

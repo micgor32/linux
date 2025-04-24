@@ -7,6 +7,8 @@
  * Copyright 2014 Gerd Hoffmann <kraxel@redhat.com>
  * Copyright 2017 Google Inc.
  * Copyright 2017 Samuel Holland <samuel@sholland.org>
+ * Copyright 2025 9elements gmbh
+ * Copyright 2025 Michal Gorlas <michal.gorlas@9elements.com>
  */
 
 #ifndef __COREBOOT_TABLE_H
@@ -14,6 +16,11 @@
 
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
+
+struct cbuint64 {
+	u32 lo;
+	u32 hi;
+};
 
 /* Coreboot table header structure */
 struct coreboot_table_header {
@@ -51,11 +58,12 @@ struct lb_cbmem_entry {
 	u32 id;
 };
 
+/* Corresponds to CB_TAG_PLD_SMM_SMRAM */
 #define CB_TAG_PLD_SMM_SMRAM          0x51
 struct lb_pld_smram_descriptor {
-	u64 physical_start;
-	u64 physical_size;
-	u64 region_state;
+	struct cbuint64 physical_start;
+	struct cbuint64 physical_size;
+	struct cbuint64 region_state;
 };
 
 struct lb_pld_smram_descriptor_block {
@@ -63,6 +71,27 @@ struct lb_pld_smram_descriptor_block {
 	u32 size;
 	u32 number_of_smm_regions;
 	struct lb_pld_smram_descriptor descriptor[1];
+};
+
+/* Corresponds to CB_TAG_PLD_S3_COMMUNICATION */
+#define CB_TAG_PLD_S3_COMMUNICATION 0x54
+struct lb_pld_s3_communication {
+	u32 tag;
+	u32 size;
+	struct lb_pld_smram_descriptor comm_buffer;
+	u8 pld_acpi_s3_enable;
+	u8 pad[3];
+};
+
+/* Corresponds to CB_TAG_PLD_MM_INTERFACE_INFO */
+#define CB_TAG_PLD_MM_INTERFACE_INFO 0x53
+struct lb_pld_mm_interface_info {
+	u32 tag;
+	u32 size;
+	u8 revision;
+	u8 requires_long_mode_call;
+	u8 register_mm_entry_swsmi;
+	u8 pad;
 };
 
 /* Describes framebuffer setup by coreboot */
@@ -94,6 +123,8 @@ struct coreboot_device {
 		struct lb_cbmem_entry cbmem_entry;
 		struct lb_framebuffer framebuffer;
 		struct lb_pld_smram_descriptor_block smram_info;
+		struct lb_pld_s3_communication s3_comm;
+		struct lb_pld_mm_interface_info mm_info;
 		DECLARE_FLEX_ARRAY(u8, raw);
 	};
 };

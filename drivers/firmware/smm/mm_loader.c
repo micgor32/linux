@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Driver for installing SMI handler and locking down SMRAM
+ * Driver for installing Linux-owned SMI handler
  *
  * Copyright (c) 2025 9elements GmbH
  *
@@ -20,7 +20,9 @@
 
 extern struct mm_info *mm_info;
 extern struct smram_info *smram;
+#ifdef CONFIG_S3_SUPPORT
 extern struct s3_comm_info *s3_info;
+#endif
 
 /* Getter for CBTABLE entries exposed by dedicated parsers.
  * Should also free the memory allocated for the exposed structs.
@@ -28,8 +30,10 @@ extern struct s3_comm_info *s3_info;
  
 static struct smm_data get_cb_data(void)
 {
-	WARN_ON(mm_info == NULL || smram == NULL || s3_info == NULL);
-
+	WARN_ON(mm_info == NULL || smram == NULL); 
+#ifdef CONFIG_S3_SUPPORT
+	WARN_ON(s3_info == NULL);
+#endif
 	int cpu_count;
 	cpu_count = num_possible_cpus();
 
@@ -37,7 +41,9 @@ static struct smm_data get_cb_data(void)
 		.mm_info = *mm_info,
 		.nr_of_smm_regions = smram->nr_of_smm_regions,
 		.cpu_count = cpu_count,
+#ifdef CONFIG_S3_SUPPORT
 		.s3_info = *s3_info
+#endif
 	};
 
 	for (int i = 0; i < ret.nr_of_smm_regions; i++) {
@@ -45,15 +51,15 @@ static struct smm_data get_cb_data(void)
 		ret.region[i].cpu_start = smram->descriptor[i].cpu_start;
 		ret.region[i].physical_size = smram->descriptor[i].physical_size;
 		ret.region[i].region_state = smram->descriptor[i].region_state;
-		printk(KERN_INFO "region %d start 0x%lx\n", i, ret.region[i].physical_start);
 
 	}
-
 
 	// just so that the parser devices can be unmounted
 	kfree(mm_info);
 	kfree(smram);
+#ifdef CONFIG_S3_SUPPORT
 	kfree(s3_info);
+#endif
 
 	return ret;
 }
@@ -164,29 +170,31 @@ static int __init mm_loader_init(void)
 	struct smm_data cb_data = get_cb_data();
 	uint32_t entry_point;
 
+	is_for_smm = SMM_INIT_HANDLER;
+	ending_code = (unsigned long)test;
+
 	int status_unlock = 1;
 	status_unlock = unlock_smram(&cb_data);
 
 	mdelay(100);
 	printk(KERN_DEBUG "status is %d\n", status_unlock);
 
-	// so now we can install the entry point
-	
-	// first see whether this is even correct
-	/*if (!cb_data.mm_info.requires_long_mode_call)*/
-	/*	entry_point = __pa(real_mode_header->startup_64);*/
-	/*else*/
-	/*	entry_point = __pa(real_mode_header->startup_32);*/
-	/**/
-	const uintptr_t location = cb_data.region[1].physical_start; //cb_data.s3_info.physical_start;
-	void __iomem *addr = ioremap((resource_size_t)location, 47);
-	printk(KERN_DEBUG "payload handler is 0x%lx, and va\n", location, addr);
-	printk(KERN_DEBUG "region 1 start 0x%lx\n", cb_data.region[1].physical_start);
-	printk(KERN_DEBUG "region 0 is 0x%lx\n", cb_data.region[0].physical_start);
-	for (int i = 0; i < cb_data.nr_of_smm_regions; i++)
-		printk(KERN_DEBUG "region %d start 0x%lx\n", i, cb_data.region[i].physical_start);
+	/*
+	 * For now let the location be default SMBASE - this is not desired place,
+	 * but it is safe for now (till we have the address of the region translated properly),
+	 * we overwrite the stub code that is used for relocation only anyways.
+	 */
+	const uintptr_t location = 0x38000;
 
-	/* There are two things we have to do before telling coreboot where the handler is:
+	/*
+	 * Size is hardcoded to 3000: real_mode_blob without mm_trampoline.S is 6000, and
+	 * with is 9000, therefore since we want all instructions that are coming after 
+	 * pa_mm_startup_32, we copy the real_mode_blob - mm_trampoline.S.
+	 */
+	void __iomem *addr = ioremap((resource_size_t)location, 3000); 
+
+	/* 
+	 * There are two things we have to do before telling coreboot where the handler is:
 	 * - modify is_for_smm so that head_$(BITS) will point to the handler code instead
 	 *   of continuing with the boot procedure (we do NOT want that to be done). I.e.
 	 *   it will call ending_code.
@@ -194,12 +202,20 @@ static int __init mm_loader_init(void)
 	 */
 	is_for_smm = SMM_INIT_HANDLER;
 	ending_code = (unsigned long)test;
+	
+	/*
+	 * Depending on bitness of coreboot, we copy different entry code to SMRAM
+	 */
+	if (!cb_data.mm_info.requires_long_mode_call)
+		memcpy_toio(addr, __va(real_mode_header->mm_trampoline_start64), 3000);
+	else
+		memcpy_toio(addr, __va(real_mode_header->mm_startup_32), 3000);
 
-	//memcpy_toio(addr, __va(real_mode_header->debug), 47);
-	//wbinvd();
+	wbinvd();
+	
 
 	int status_reg = 1;
-	status_reg = register_entry_point(&cb_data, cb_data.region[1].physical_start);
+	status_reg = register_entry_point(&cb_data, 0x38000);
 
 	mdelay(100);
 	printk(KERN_DEBUG "status is %d\n", status_reg);
@@ -210,12 +226,12 @@ static int __init mm_loader_init(void)
 	mdelay(100);
 	printk(KERN_DEBUG "status is %d\n", status_lock);
 
-		
 	return 0;
 }
 
 static void __exit mm_loader_exit(void)
 {
+	// Nothing to be cleaned here.
 	printk(KERN_DEBUG "DONE");
 }
 
@@ -223,5 +239,5 @@ module_init(mm_loader_init);
 module_exit(mm_loader_exit);
 
 MODULE_AUTHOR("Michal Gorlas <michal.gorlas@9elements.com>");
-MODULE_DESCRIPTION("MM loader - installs payload-owned SMI handler");
+MODULE_DESCRIPTION("MM loader - installs Linux-owned SMI handler");
 MODULE_LICENSE("GPL v2");

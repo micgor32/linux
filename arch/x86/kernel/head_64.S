@@ -443,7 +443,7 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	xorl	%ebp, %ebp
 	ANNOTATE_RETPOLINE_SAFE
 	callq	*ending_code(%rip) // Because "ending" is opposite of "initial". Couldn't help myself here sorry :D
-	//rsm
+	rsm
 SYM_CODE_END(secondary_startup_64)
 
 #include "verify_cpu.S"
@@ -511,6 +511,9 @@ SYM_DATA(initial_vc_handler,	.quad handle_vc_boot_ghcb)
 SYM_DATA(ending_code,	.quad 0)
 
 SYM_DATA(trampoline_lock, .quad 0);
+	__FINITDATA
+
+SYM_DATA(mm_lock, .quad 0);
 	__FINITDATA
 
 	__INIT
