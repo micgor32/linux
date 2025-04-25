@@ -3,38 +3,24 @@
 if GOOGLE_FIRMWARE && GOOGLE_COREBOOT_TABLE
 
 menuconfig SMM_DRIVER
-	bool "SMM initialization (LinuxBootSMM)"
+	bool "SMM from Linux (LinuxBootSMM)"
 	default n
 	help
-	  Enables driver for initializing System Management Mode (SMM).
-	  Only to be used when compiling as kernel for coreboot+LinuxBootSMM
-	  setup. If in doubt, say N.
+	  Enables support for System Management Mode (SMM) handling by Linux.
+	  coreboot reserves region for payload-owned SMI handler, shares this
+	  information with the payload using coreboot tables, and leaves SMRAM
+	  closed (but unlocked). Payload (Linux) is responsible for unlocking SMRAM,
+	  installing handler in dedicated region and locking SMRAM.
+	  If in doubt, say N.
 if SMM_DRIVER
-
-config SMM_PAYLOAD
-	bool "Payload owns SMM (not working)"
-	default n
-	help
-	  This is NOT working, this config is left so that its easier for me to
-	  distinguish the code for testing purposes.
-
-config MM_PAYLOAD
-	bool "Payload MM"
-	default n
-	help
-	  coreboot owns SMM, Linux installs handler to the dedicated region and locks
-	  SMRAM.
-
-config SPI_SMM
-	bool "SPI store in SMM (not working)"
-	default n
-	help
-	  Enables parser for the SPI layout needed to enable SMM SPI support. 
 
 config S3_SUPPORT_SMM
 	bool "Enable payload-bootloader communication on S3 resume"
 	depends on ARCH_SUSPEND_POSSIBLE && SUSPEND
 	default n
+	help
+	  If platform supports S3 resume, enables parser for S3 communication
+	  info shared in coreboot table.
 endif 
 
 endif

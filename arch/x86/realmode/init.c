@@ -86,7 +86,7 @@ static void __init sme_sev_setup_real_mode(struct trampoline_header *th)
 }
 
 struct trampoline_header *trampoline_header;
-#ifdef CONFIG_MM_PAYLOAD
+#ifdef CONFIG_SMM_DRIVER
 struct trampoline_header *mm_tram_header;
 #endif
 static void __init setup_real_mode(void)
@@ -177,7 +177,7 @@ static void __init setup_real_mode(void)
 		trampoline_pgd[i] = init_top_pgt[i].pgd;
 #endif
 
-#ifdef CONFIG_MM_PAYLOAD
+#ifdef CONFIG_SMM_DRIVER
 	u64 *mm_trampoline_pgd;
 	u32 *mm_tram_cr4_features;
 
