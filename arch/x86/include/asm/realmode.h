@@ -23,7 +23,6 @@ struct real_mode_header {
 	/* SMP trampoline */
 	u32	trampoline_start;
 	u32	trampoline_header;
-	u32	debug;
 	/* Needed only for MM payload */
 #ifdef CONFIG_MM_PAYLOAD
 	u32	mm_trampoline_start;
@@ -82,7 +81,6 @@ extern unsigned long initial_vc_handler;
 
 // for now lets reuse it for the stub (?)
 extern u32 *trampoline_lock;
-extern u32 *mm_lock;
 
 extern unsigned char real_mode_blob[];
 extern unsigned char real_mode_relocs[];

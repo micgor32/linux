@@ -233,22 +233,7 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	 */
 	btsl	$X86_CR4_PGE_BIT, %ecx
 	movq	%rcx, %cr4
-	//jmp	.Lnormal
 
-	//movl	is_for_smm(%rip), %ecx
-	//testl	$SMM_INIT_HANDLER, %ecx
-	//jz	.Lnormal
-
-//.Ljump_to_end:			// this is for debugging
-//	mov	$0x3f8, %dx
-//	mov	$'C', %al
-//	out	%al, (%dx)
-//	mov	$'r', %al
-//	out	%al, (%dx)
-//	rsm
-
-
-.Lnormal:
 #ifdef CONFIG_SMP
 	/*
 	 * For parallel boot, the APIC ID is read from the APIC, and then
@@ -443,7 +428,7 @@ SYM_INNER_LABEL(common_startup_64, SYM_L_LOCAL)
 	xorl	%ebp, %ebp
 	ANNOTATE_RETPOLINE_SAFE
 	callq	*ending_code(%rip) // Because "ending" is opposite of "initial". Couldn't help myself here sorry :D
-	rsm
+
 SYM_CODE_END(secondary_startup_64)
 
 #include "verify_cpu.S"
@@ -511,9 +496,6 @@ SYM_DATA(initial_vc_handler,	.quad handle_vc_boot_ghcb)
 SYM_DATA(ending_code,	.quad 0)
 
 SYM_DATA(trampoline_lock, .quad 0);
-	__FINITDATA
-
-SYM_DATA(mm_lock, .quad 0);
 	__FINITDATA
 
 	__INIT

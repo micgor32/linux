@@ -187,18 +187,18 @@ static void __init setup_real_mode(void)
 
 	mm_tram_header->start = (u64) secondary_startup_64;
 
-	mm_lock = &mm_tram_header->lock;
-	*mm_lock = 0;
+	//mm_lock = &mm_tram_header->lock;
+	//*mm_lock = 0;
 
-	mm_tram_cr4_features = trampoline_cr4_features;
+	//mm_tram_cr4_features = trampoline_cr4_features;
 
 	mm_tram_header->flags = 0;
 
-	mm_trampoline_pgd = (u64 *) __va(real_mode_header->trampoline_pgd);
-	mm_trampoline_pgd[0] = trampoline_pgd_entry.pgd;
+	//mm_trampoline_pgd = (u64 *) __va(real_mode_header->trampoline_pgd);
+	//mm_trampoline_pgd[0] = trampoline_pgd_entry.pgd;
 
-	for (i = pgd_index(__PAGE_OFFSET); i < PTRS_PER_PGD; i++)
-		mm_trampoline_pgd[i] = init_top_pgt[i].pgd;
+	//for (i = pgd_index(__PAGE_OFFSET); i < PTRS_PER_PGD; i++)
+	//	mm_trampoline_pgd[i] = init_top_pgt[i].pgd;
 
 	/* This has to be set to 0 for the normal boot.
 	 * In case of reusing the trampoline from SMM,

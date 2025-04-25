@@ -103,12 +103,6 @@ no_longmode:
 	jmp no_longmode
 SYM_CODE_END(trampoline_start)
 
-/*SYM_CODE_START(debug)
-.test:
-	rsm
-SYM_CODE_END(debug) */
-
-
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 /* SEV-ES supports non-zero IP for entry points - no alignment needed */
 SYM_CODE_START(sev_es_trampoline_start)
@@ -200,13 +194,6 @@ SYM_CODE_START(startup_32)
 
 	ljmpl	$__KERNEL_CS, $pa_startup_64
 SYM_CODE_END(startup_32)
-
-SYM_CODE_START(debug)
-	jmp .test
-.test:
-	ret
-SYM_CODE_END(debug)
-
 
 SYM_CODE_START(pa_trampoline_compat)
 	/*

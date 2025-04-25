@@ -58,7 +58,7 @@ modules.order
 
 uroot.sh
 full.sh
-/ldtest
+/drivers/firmware/ldtest/
 
 #
 # Top-level generic files

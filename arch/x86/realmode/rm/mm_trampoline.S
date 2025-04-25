@@ -6,23 +6,15 @@
  *	4 Jan 1997 Michael Chastain: changed to gnu as.
  *	15 Sept 2005 Eric Biederman: 64bit PIC support
  *
- *	Entry: CS:IP point to the start of our code, we are
- *	in real mode with no stack, but the rest of the
- *	trampoline page to make our stack and everything else
- *	is a mystery.
- *
- *	On entry to trampoline_start, the processor is in real mode
- *	with 16-bit addressing and 16-bit data.  CS has some value
- *	and IP is zero.  Thus, data addresses need to be absolute
- *	(no relocation) and are taken with regard to r_base.
- *
- *	With the addition of trampoline_level4_pgt this code can
- *	now enter a 64bit kernel that lives at arbitrary 64bit
- *	physical addresses.
- *
- *	If you work on this file, check the object module with objdump
- *	--full-contents --reloc to make sure there are no relocation
- *	entries.
+ *	The purpose of this code is to get us from whatever mode
+ *	coreboot leaves us in when entering SMM, to the kernel space.
+ *	
+ *	Derived from trampoline_$(BITS).S, shrinked to the parts that 
+ *	are needed once in SMM (for e.g. we are at least in protected mode
+ *	at this point). The instructions from mm_startup_32 on are placed
+ *	by drivers/firmware/smm/mm_loader.c under designated SMRAM region.
+ *	
+ *	Also see the general comment in trampoline_64.S.
  */
 
 #include <linux/linkage.h>

@@ -26,8 +26,10 @@ config MM_PAYLOAD
 	  SMRAM.
 
 config SPI_SMM
-	bool "SPI store in SMM"
+	bool "SPI store in SMM (not working)"
 	default n
+	help
+	  Enables parser for the SPI layout needed to enable SMM SPI support. 
 
 config S3_SUPPORT_SMM
 	bool "Enable payload-bootloader communication on S3 resume"
