@@ -25,7 +25,6 @@ struct real_mode_header {
 	u32	trampoline_header;
 #ifdef CONFIG_SMM_DRIVER
 	/* Needed only for MM payload */
-	u32	mm_trampoline_start;
 	u32	mm_startup_32;
 	u32	mm_trampoline_header;
 	u32	mm_trampoline_start64;

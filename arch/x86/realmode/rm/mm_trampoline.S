@@ -27,85 +27,6 @@
 
 #include "realmode.h"
 
-	.text
-	.code16
-
-.macro LOCK_AND_LOAD_REALMODE_ESP lock_pa=0 lock_rip=0
-	/*
-	 * Make sure only one CPU fiddles with the realmode stack
-	 */
-.Llock_rm\@:
-	.if \lock_pa
-        lock btsl       $0, pa_tr_lock
-	.elseif \lock_rip
-        lock btsl       $0, tr_lock(%rip)
-	.else
-        lock btsl       $0, tr_lock
-	.endif
-        jnc             2f
-        pause
-        jmp             .Llock_rm\@
-2:
-	# Setup stack
-	movl	$rm_stack_end, %esp
-.endm
-
-	.balign	PAGE_SIZE
-SYM_CODE_START(mm_trampoline_start)
-	// we are already in protected mode at this point (assuming cb was compiled for 32bit),
-	// but we need to get to kernel address space
-	mov	$0x3f8, %dx
-	mov	$'H', %al
-	out	%al, (%dx)
-	mov	$'\n', %al
-	out	%al, (%dx)
-	ret
-
-	cli			# We should be safe anyway
-	wbinvd
-
-	LJMPW_RM(1f)
-1:
-	mov	%cs, %ax	# Code and data in the same place
-	mov	%ax, %ds
-	mov	%ax, %es
-	mov	%ax, %ss
-
-	LOCK_AND_LOAD_REALMODE_ESP
-
-	call	verify_cpu		# Verify the cpu supports long mode
-	testl   %eax, %eax		# Check for return code
-	jnz	no_longmode
-
-
-.Lswitch_to_protected:
-	/*
-	 * GDT tables in non default location kernel can be beyond 16MB and
-	 * lgdt will not be able to load the address as in real mode default
-	 * operand size is 16bit. Use lgdtl instead to force operand size
-	 * to 32 bit.
-	 */
-
-	lidtl	tr_idt	# load idt with 0, 0
-	lgdtl	tr_gdt	# load gdt with whatever is appropriate
-
-	movw	$__KERNEL_DS, %dx	# Data segment descriptor
-
-	# Enable protected mode
-	movl	$(CR0_STATE & ~X86_CR0_PG), %eax
-	movl	%eax, %cr0		# into protected mode
-
-	ret
-	# flush prefetch and jump to startup_32
-	ljmpl	$__KERNEL32_CS, $pa_startup_32
-
-no_longmode:
-	hlt
-	jmp no_longmode
-SYM_CODE_END(mm_trampoline_start)
-
-#include "../kernel/verify_cpu.S"
-
 	.section ".text32","ax"
 	.code32
 	.balign 4
@@ -184,31 +105,6 @@ SYM_CODE_START(mm_startup_32)
 
 	ljmpl	$__KERNEL_CS, $pa_mm_startup_64
 SYM_CODE_END(mm_startup_32)
-
-SYM_CODE_START(pa_mm_trampoline_compat)
-	// cleanup for coreboot
-	pop	%esp
-	pop	%ebp
-	pop	%ebx
-	pop	%esi
-	pop	%edi
-	pop	%eax
-	
-	movl	%ebx, %cr4
-	movl	%eax, %cr3
-
-
-	/*
-	 * In compatibility mode.  Prep ESP and DX for startup_32, then disable
-	 * paging and complete the switch to legacy 32-bit mode.
-	 */
-	//LOCK_AND_LOAD_REALMODE_ESP lock_pa=1
-//	movw	$__KERNEL_DS, %dx
-
-//	movl	$(CR0_STATE & ~X86_CR0_PG), %eax
-//	movl	%eax, %cr0
-//	ljmpl   $__KERNEL32_CS, $pa_mm_startup_32
-SYM_CODE_END(pa_mm_trampoline_compat)
 
 	.section ".text64","ax"
 	.code64
@@ -341,9 +237,6 @@ SYM_DATA_START(mm_trampoline_header)
 	SYM_DATA(tr_smm_cr4,		.space 4)
 	SYM_DATA(tr_smm_flags,		.space 4)
 	SYM_DATA(tr_smm_lock,		.space 4)
-	SYM_DATA(tr_smm_stack_size,		.space 4)
-	SYM_DATA(tr_smm_stack_top,		.space 4)
-	SYM_DATA(tr_smm_apic_to_cpu_num,	.space 2)
 SYM_DATA_END(mm_trampoline_header)
 	
 #include "trampoline_common.S"

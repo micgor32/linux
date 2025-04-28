@@ -20,7 +20,7 @@
 
 extern struct mm_info *mm_info;
 extern struct smram_info *smram;
-#ifdef CONFIG_S3_SUPPORT
+#ifdef CONFIG_S3_SUPPORT_SMM
 extern struct s3_comm_info *s3_info;
 #endif
 

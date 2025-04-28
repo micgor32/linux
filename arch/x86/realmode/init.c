@@ -187,13 +187,9 @@ static void __init setup_real_mode(void)
 
 	mm_tram_header->start = (u64) secondary_startup_64;
 
-	//mm_lock = &mm_tram_header->lock;
-	//*mm_lock = 0;
-
-	//mm_tram_cr4_features = trampoline_cr4_features;
-
 	mm_tram_header->flags = 0;
 
+	// For now not needed anyways.
 	//mm_trampoline_pgd = (u64 *) __va(real_mode_header->trampoline_pgd);
 	//mm_trampoline_pgd[0] = trampoline_pgd_entry.pgd;
 

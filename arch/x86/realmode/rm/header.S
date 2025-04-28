@@ -21,7 +21,6 @@ SYM_DATA_START(real_mode_header)
 	.long	pa_trampoline_start
 	.long	pa_trampoline_header
 #ifdef CONFIG_SMM_DRIVER
-	.long	pa_mm_trampoline_start
 	.long	pa_mm_startup_32
 	.long	pa_mm_trampoline_header
 	.long	pa_mm_trampoline_start64
