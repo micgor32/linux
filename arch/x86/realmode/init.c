@@ -48,21 +48,24 @@ void __init reserve_real_mode(void)
 	phys_addr_t mem;
 	size_t size = real_mode_size_needed();
 
-	if (!size) {
-		pr_info("no size for rm trampoline\n");
+	pr_info("size is %zx\n", size);
+
+	if (!size)
 		return;
-	}
 
 	WARN_ON(slab_is_available());
 
 	/* Has to be under 1M so we can execute real-mode AP code. */
 	mem = memblock_phys_alloc_range(size, PAGE_SIZE, 0, 1<<20);
-	pr_info("mem for real mode 0x%llu", mem);
 	if (!mem)
 		pr_info("No sub-1M memory is available for the trampoline\n");
 	else
 		set_real_mode_mem(mem);
 
+	/*
+	 * Unconditionally reserve the entire first 1M, see comment in
+	 * setup_arch().
+	 */
 	memblock_reserve(0, SZ_1M);
 }
 
@@ -77,7 +80,7 @@ static void __init sme_sev_setup_real_mode(struct trampoline_header *th)
 		 * Skip the call to verify_cpu() in secondary_startup_64 as it
 		 * will cause #VC exceptions when the AP can't handle them yet.
 		 */
-		th->start = (u64) secondary_startup_64_no_verify;
+		th->start = (u64)secondary_startup_64_no_verify;
 
 		if (sev_es_setup_ap_jump_table(real_mode_header))
 			panic("Failed to get/update SEV-ES AP Jump Table");
@@ -97,7 +100,6 @@ static void __init setup_real_mode(void)
 	unsigned char *base;
 	unsigned long phys_base;
 	size_t size = PAGE_ALIGN(real_mode_blob_end - real_mode_blob);
-	printk("size of the blob %zx\n", size);
 #ifdef CONFIG_X86_64
 	u64 *trampoline_pgd;
 	u64 efer;
@@ -117,29 +119,28 @@ static void __init setup_real_mode(void)
 	memcpy(base, real_mode_blob, size);
 
 	phys_base = __pa(base);
-	printk("phys base is 0x%lx", phys_base);
 	real_mode_seg = phys_base >> 4;
 
-	rel = (u32 *) real_mode_relocs;
+	rel = (u32 *)real_mode_relocs;
 
 	/* 16-bit segment relocations. */
 	count = *rel++;
 	while (count--) {
-		u16 *seg = (u16 *) (base + *rel++);
+		u16 *seg = (u16 *)(base + *rel++);
 		*seg = real_mode_seg;
 	}
 
 	/* 32-bit linear relocations. */
 	count = *rel++;
 	while (count--) {
-		u32 *ptr = (u32 *) (base + *rel++);
+		u32 *ptr = (u32 *)(base + *rel++);
 		*ptr += phys_base;
 	}
 
 	/* Must be performed *after* relocation. */
 	trampoline_header = (struct trampoline_header *)
 		__va(real_mode_header->trampoline_header);
-	
+
 #ifdef CONFIG_X86_32
 	trampoline_header->start = __pa_symbol(startup_32_smp);
 	trampoline_header->gdt_limit = __BOOT_DS + 7;
@@ -152,8 +153,7 @@ static void __init setup_real_mode(void)
 	rdmsrl(MSR_EFER, efer);
 	trampoline_header->efer = efer & ~EFER_LMA;
 
-	trampoline_header->start = (u64) secondary_startup_64;
-	//trampoline_header->smm_start = (u64) test_p;
+	trampoline_header->start = (u64)secondary_startup_64;
 
 	trampoline_cr4_features = &trampoline_header->cr4;
 	*trampoline_cr4_features = mmu_cr4_features;
@@ -163,7 +163,7 @@ static void __init setup_real_mode(void)
 	trampoline_lock = &trampoline_header->lock;
 	*trampoline_lock = 0;
 
-	trampoline_pgd = (u64 *) __va(real_mode_header->trampoline_pgd);
+	trampoline_pgd = (u64 *)__va(real_mode_header->trampoline_pgd);
 
 	/* Map the real mode stub as virtual == physical */
 	trampoline_pgd[0] = trampoline_pgd_entry.pgd;
@@ -178,16 +178,14 @@ static void __init setup_real_mode(void)
 #endif
 
 #ifdef CONFIG_SMM_DRIVER
-	u64 *mm_trampoline_pgd;
-	u32 *mm_tram_cr4_features;
+	// Not needed for now
+	//u64 *mm_trampoline_pgd;
+	//u32 *mm_tram_cr4_features;
 
 	mm_tram_header =  (struct trampoline_header *)
 		__va(real_mode_header->trampoline_header);
-	mm_tram_header->efer = efer & ~EFER_LMA;
 
-	mm_tram_header->start = (u64) secondary_startup_64;
-
-	mm_tram_header->flags = 0;
+	mm_tram_header->start = (u64)secondary_startup_64;
 
 	// For now not needed anyways.
 	//mm_trampoline_pgd = (u64 *) __va(real_mode_header->trampoline_pgd);
@@ -200,7 +198,7 @@ static void __init setup_real_mode(void)
 	 * In case of reusing the trampoline from SMM,
 	 * this value will be overwritten by the driver.
 	 */
-	
+
 	is_for_smm = 0;
 #endif
 
@@ -217,7 +215,7 @@ static void __init setup_real_mode(void)
  */
 static void __init set_real_mode_permissions(void)
 {
-	unsigned char *base = (unsigned char *) real_mode_header;
+	unsigned char *base = (unsigned char *)real_mode_header;
 	size_t size = PAGE_ALIGN(real_mode_blob_end - real_mode_blob);
 
 	size_t ro_size =
@@ -229,11 +227,11 @@ static void __init set_real_mode_permissions(void)
 		real_mode_header->text_start;
 
 	unsigned long text_start =
-		(unsigned long) __va(real_mode_header->text_start);
+		(unsigned long)__va(real_mode_header->text_start);
 
-	set_memory_nx((unsigned long) base, size >> PAGE_SHIFT);
-	set_memory_ro((unsigned long) base, ro_size >> PAGE_SHIFT);
-	set_memory_x((unsigned long) text_start, text_size >> PAGE_SHIFT);
+	set_memory_nx((unsigned long)base, size >> PAGE_SHIFT);
+	set_memory_ro((unsigned long)base, ro_size >> PAGE_SHIFT);
+	set_memory_x((unsigned long)text_start, text_size >> PAGE_SHIFT);
 }
 
 void __init init_real_mode(void)

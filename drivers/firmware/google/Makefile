@@ -12,3 +12,9 @@ obj-$(CONFIG_GOOGLE_CBMEM)		+= cbmem.o
 
 vpd-sysfs-y := vpd.o vpd_decode.o
 obj-$(CONFIG_GOOGLE_VPD)		+= vpd-sysfs.o
+
+# LinuxBootSMM related.
+obj-$(CONFIG_SMM_DRIVER)		+= smram.o
+obj-$(CONFIG_SMM_DRIVER)		+= mm_info.o
+obj-$(CONFIG_S3_SUPPORT_SMM)		+= s3_comm.o
+obj-$(CONFIG_SMM_DRIVER)		+= mm_loader.o

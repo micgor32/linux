@@ -10,7 +10,7 @@
 #include <asm/segment.h>
 
 #include "realmode.h"
-	
+
 	.section ".header", "a"
 
 	.balign	16
@@ -21,10 +21,10 @@ SYM_DATA_START(real_mode_header)
 	.long	pa_trampoline_start
 	.long	pa_trampoline_header
 #ifdef CONFIG_SMM_DRIVER
+	/* Payload MM trampoline */
 	.long	pa_mm_startup_32
 	.long	pa_mm_trampoline_header
 	.long	pa_mm_trampoline_start64
-	.long	pa_mm_trampoline_pgd
 #endif
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	.long	pa_sev_es_trampoline_start

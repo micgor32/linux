@@ -59,7 +59,7 @@ struct lb_cbmem_entry {
 };
 
 /* Corresponds to CB_TAG_PLD_SMM_SMRAM */
-#define CB_TAG_PLD_SMM_SMRAM          0x51
+#define CB_TAG_PLD_SMM_SMRAM 0x51
 struct lb_pld_smram_descriptor {
 	struct cbuint64 physical_start;
 	struct cbuint64 physical_size;
@@ -70,7 +70,7 @@ struct lb_pld_smram_descriptor_block {
 	u32 tag;
 	u32 size;
 	u32 number_of_smm_regions;
-	struct lb_pld_smram_descriptor descriptor[1];
+	struct lb_pld_smram_descriptor descriptor[];
 };
 
 /* Corresponds to CB_TAG_PLD_S3_COMMUNICATION */
@@ -103,15 +103,15 @@ struct lb_framebuffer {
 	u32 x_resolution;
 	u32 y_resolution;
 	u32 bytes_per_line;
-	u8  bits_per_pixel;
-	u8  red_mask_pos;
-	u8  red_mask_size;
-	u8  green_mask_pos;
-	u8  green_mask_size;
-	u8  blue_mask_pos;
-	u8  blue_mask_size;
-	u8  reserved_mask_pos;
-	u8  reserved_mask_size;
+	u8 bits_per_pixel;
+	u8 red_mask_pos;
+	u8 red_mask_size;
+	u8 green_mask_pos;
+	u8 green_mask_size;
+	u8 blue_mask_pos;
+	u8 blue_mask_size;
+	u8 reserved_mask_pos;
+	u8 reserved_mask_size;
 };
 
 /* A device, additionally with information from coreboot. */
@@ -157,8 +157,8 @@ void coreboot_driver_unregister(struct coreboot_driver *driver);
  * boilerplate.  Each module may only use this macro once, and
  * calling it replaces module_init() and module_exit()
  */
-#define module_coreboot_driver(__coreboot_driver) \
+#define module_coreboot_driver(__coreboot_driver)                  \
 	module_driver(__coreboot_driver, coreboot_driver_register, \
-			coreboot_driver_unregister)
+		      coreboot_driver_unregister)
 
 #endif /* __COREBOOT_TABLE_H */

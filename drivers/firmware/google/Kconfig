@@ -81,4 +81,22 @@ config GOOGLE_VPD
 	  This option enables the kernel to expose the content of Google VPD
 	  under /sys/firmware/vpd.
 
+config SMM_DRIVER
+	tristate "SMM from Linux (LinuxBootSMM)"
+	depends on GOOGLE_COREBOOT_TABLE
+	help
+	  Enables support for System Management Mode (SMM) handling by Linux.
+	  coreboot reserves region for payload-owned SMI handler, shares this
+	  information with the payload using coreboot tables, and leaves SMRAM
+	  closed (but unlocked). Payload (Linux) is responsible for unlocking SMRAM,
+	  installing handler in dedicated region and locking SMRAM.
+	  If in doubt, say N.
+
+config S3_SUPPORT_SMM
+	tristate "Enable payload-bootloader communication on S3 resume"
+	depends on ARCH_SUSPEND_POSSIBLE && SUSPEND && SMM_DRIVER
+	help
+	  If platform supports S3 resume, enables parser for S3 communication
+	  info shared in coreboot table.
+
 endif # GOOGLE_FIRMWARE

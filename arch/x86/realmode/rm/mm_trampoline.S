@@ -7,13 +7,14 @@
  *	15 Sept 2005 Eric Biederman: 64bit PIC support
  *
  *	The purpose of this code is to get us from whatever mode
- *	coreboot leaves us in when entering SMM, to the kernel space.
- *	
- *	Derived from trampoline_$(BITS).S, shrinked to the parts that 
+ *	coreboot leaves us in when entering SMM, to the MM payload
+	handler.
+ *
+ *	Derived from trampoline_$(BITS).S, shrinked to the parts that
  *	are needed once in SMM (for e.g. we are at least in protected mode
  *	at this point). The instructions from mm_startup_32 on are placed
  *	by drivers/firmware/smm/mm_loader.c under designated SMRAM region.
- *	
+ *
  *	Also see the general comment in trampoline_64.S.
  */
 
@@ -31,6 +32,7 @@
 	.code32
 	.balign 4
 SYM_CODE_START(mm_startup_32)
+	// remove later and write to the serial from C code first
 	mov	$0x3f8, %dx
 	mov	$'H', %al
 	out	%al, (%dx)
@@ -66,51 +68,105 @@ SYM_CODE_START(mm_startup_32)
 	out	%al, (%dx)
 	mov	$'\n', %al
 	out	%al, (%dx)
+	// till here
 
-	/* 
-	 * For now, we return back to the coreboot's handler here.
-	 * TODO: preserve registers, and bring the CPU to the state
-	 * where the kernel address space is callable
-	 */
+	// Normally the verify_cpu.S does multiple checks, we just do one simple check
+	movl    $0x80000000,%eax	# See if extended cpuid is implemented
+	cpuid
+	cmpl    $0x80000001,%eax
+	jb      no_longmode
+
+	// ebx, esi, edi and ebp are going to be preserved (see comment in smm_stub.S if target is x86_64)
+	push	%ebx
+	push	%esi
+	push	%edi
+	push	%ebp
+
+	// preserve cr4 and enable PAE mode	
+	movl	%cr4, %eax
+	push	%eax
+	movl	pa_tr_cr4, %eax
+	movl	%eax, %cr4
+	
+	// preserve cr3 and setup 4 level page tables
+	movl	%cr3, %ebx
+	push	%ebx
+	movl	$pa_trampoline_pgd, %ebx
+	movl	%ebx, %cr3
+
+	// clear XD bit
+	movl	$MSR_IA32_MISC_ENABLE, %ecx
+	rdmsr
+	btrl	$2, %edx		# clear MSR_IA32_MISC_ENABLE_XD_DISABLE
+	wrmsr
+
+	// efer setup
+	movl	pa_tr_efer, %eax
+	movl	pa_tr_efer + 4, %edx
+	movl	$MSR_EFER, %ecx
+	wrmsr
+
+	movl	%cr0, %eax
+	push	%eax
+
+	// If uncommented, will just skip enabling longmode and jump to "compat" mode which will restore pre-trampoline state/
+	// we have to jump there anyways, but that should be done from mm_startup_64 as the last thig in the longmode.
+	//ljmpl	$0x08, $pa_mm_compat
+
+	// So for now this hangs on the long jump.
+	movl	0x80050032, %eax
+	movl	%eax, %cr0
+	
+	mov	$0x3f8, %dx
+	mov	$'W', %al
+	out	%al, (%dx)
+
+	ljmpl	$0x18, $pa_mm_startup_64
+
+no_longmode: // Assuming that kernel was compiled in 64bit, and we get here, there is nothing left to do.
+	ret
+SYM_CODE_END(mm_startup_32)
+
+SYM_CODE_START(mm_compat)
+	// Restore cr4, cr3 adn cr0 to whatever state it was when exiting coreboot. Essentially a compatibility mode
+	mov	$0x3f8, %dx
+	mov	$'C', %al
+	out	%al, (%dx)
+
+	pop	%eax
+	movl	%eax, %cr0
+
+	pop	%ebx
+	movl	%ebx, %cr3
+
+	pop	%eax
+	movl	%eax, %cr3
+
+	// restore remaining registers
+	pop %ebp
+	pop %edi
+	pop %esi
+	pop %ebx
+
 	ret
 
-	// 0x80050033
-
-	lidtl	tr_idt	# load idt with 0, 0
-	lgdtl	tr_smm_gdt	# load gdt with whatever is appropriate
-
-	movw	$__KERNEL_DS, %dx	# Data segment descriptor
-
-	# Enable protected mode
-	movl	$(CR0_STATE & ~X86_CR0_PG), %eax
-	movl	%eax, %cr0		# into protected mode
-
-
-	movl	0x4010, %eax
-	movl	%eax, %cr4
-
-	movl	$0x3000, %eax
-	movl	%eax, %cr3
-	movl	$MSR_EFER, %ecx
-
-	//movl $0x80050033, %eax	
-	//movl %eax, %cr0
-
-	/*
-	 * At this point we're in long mode but in 32bit compatibility mode
-	 * with EFER.LME = 1, CS.L = 0, CS.D = 1 (and in turn
-	 * EFER.LMA = 1). Now we want to jump in 64bit mode, to do that we use
-	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
-	 */
-
-	ljmpl	$__KERNEL_CS, $pa_mm_startup_64
-SYM_CODE_END(mm_startup_32)
+SYM_CODE_END(mm_compat)
 
 	.section ".text64","ax"
 	.code64
 	.balign 4
 SYM_CODE_START(mm_startup_64)
-	jmpq *tr_smm_start(%rip)
+	mov	$0x3f8, %dx
+	mov	$'L', %al
+	out	%al, (%dx)
+
+	movw $__KERNEL_DS, %dx
+
+	//movl	$(CR0_STATE & ~X86_CR0_PG), %eax
+	//movl	%eax, %cr0
+	ljmpl   *tr_mm_compat(%rip)
+
+	//jmpq *tr_smm_start(%rip)
 SYM_CODE_END(mm_startup_64)
 
 /*
@@ -158,85 +214,16 @@ SYM_CODE_START(mm_trampoline_start64)
 	out	%al, (%dx)
 	mov	$'\n', %al
 	out	%al, (%dx)
-
 	ret
-	/*
-	 * APs start here on a direct transfer from 64-bit BIOS with identity
-	 * mapped page tables.  Load the kernel's GDT in order to gear down to
-	 * 32-bit mode (to handle 4-level vs. 5-level paging), and to (re)load
-	 * segment registers.  Load the zero IDT so any fault triggers a
-	 * shutdown instead of jumping back into BIOS.
-	 */
-	lidt	tr_idt(%rip)
-	lgdt	tr_smm_gdt64(%rip)
 
-	/* Check if paging mode has to be changed */
-	movq	%cr4, %rax
-	xorl	tr_smm_cr4(%rip), %eax
-	testl	$X86_CR4_LA57, %eax
-	jnz	.L_switch_paging
-
-	/* Paging mode is correct proceed in 64-bit mode */
-
-	LOCK_AND_LOAD_REALMODE_ESP lock_rip=1
-
-	movw	$__KERNEL_DS, %dx
-	movl	%edx, %ss
-	addl	$pa_real_mode_base, %esp
-	movl	%edx, %ds
-	movl	%edx, %es
-	movl	%edx, %fs
-	movl	%edx, %gs
-
-	movl	$pa_mm_trampoline_pgd, %eax
-	movq	%rax, %cr3
-
-	pushq	$__KERNEL_CS
-	pushq	tr_smm_start(%rip)
-	lretq
-.L_switch_paging:
-	/*
-	 * To switch between 4- and 5-level paging modes, it is necessary
-	 * to disable paging. This must be done in the compatibility mode.
-	 */
-	ljmpl	*tr_smm_compat(%rip)
 SYM_CODE_END(mm_trampoline_start64)
 
-	.section ".rodata","a"
-	# Duplicate the global descriptor table
-	# so the kernel can live anywhere
-	.balign	16
-SYM_DATA_START(tr_smm_gdt)
-	.short	tr_smm_gdt_end - tr_smm_gdt - 1	# gdt limit
-	.long	pa_tr_smm_gdt
-	.short	0
-	.quad	0x00cf9b000000ffff	# __KERNEL32_CS
-	.quad	0x00af9b000000ffff	# __KERNEL_CS
-	.quad	0x00cf93000000ffff	# __KERNEL_DS
-SYM_DATA_END_LABEL(tr_smm_gdt, SYM_L_LOCAL, tr_smm_gdt_end)
-
-SYM_DATA_START(tr_smm_gdt64)
-	.short	tr_smm_gdt_end - tr_smm_gdt - 1	# gdt limit
-	.long	pa_tr_smm_gdt
-	.long	0
-SYM_DATA_END(tr_smm_gdt64)
-
-SYM_DATA_START(tr_smm_compat)
-	.long	pa_mm_trampoline_compat
+SYM_DATA_START(tr_mm_compat)
+	.long	pa_mm_compat
 	.short	__KERNEL32_CS
-SYM_DATA_END(tr_smm_compat)
-
-	.bss
-	.balign	PAGE_SIZE
-SYM_DATA(mm_trampoline_pgd, .space PAGE_SIZE)
+SYM_DATA_END(tr_mm_compat)
 
 	.balign	8
 SYM_DATA_START(mm_trampoline_header)
 	SYM_DATA_LOCAL(tr_smm_start,	.space 8)
-	SYM_DATA(tr_smm_efer,		.space 8)
-	SYM_DATA(tr_smm_cr4,		.space 4)
-	SYM_DATA(tr_smm_flags,		.space 4)
-	SYM_DATA(tr_smm_lock,		.space 4)
 SYM_DATA_END(mm_trampoline_header)
-	
-#include "trampoline_common.S"

@@ -11,14 +11,21 @@
 #ifndef __SMM_H
 #define __SMM_H
 
-#define PAYLOAD_MM_RET_SUCCESS     0
-#define PAYLOAD_MM_RET_FAILURE	   1
-#define PAYLOAD_MM_UNLOCK_SMRAM    1
-#define PAYLOAD_MM_REGISTER_ENTRY  2
-#define PAYLOAD_MM_LOCK_SMRAM      3
+#include "coreboot_table.h"
 
-u64 lshift(u64 opr, uint count);
-u64 unpack_cbuint64(struct cbuint64 inp);
+#define PAYLOAD_MM_RET_SUCCESS 0
+#define PAYLOAD_MM_RET_FAILURE 1
+#define PAYLOAD_MM_UNLOCK_SMRAM 1
+#define PAYLOAD_MM_REGISTER_ENTRY 2
+#define PAYLOAD_MM_LOCK_SMRAM 3
+
+extern u64 lshift(u64 opr, uint count);
+extern u64 unpack_cbuint64(struct cbuint64 inp);
+extern struct mm_info *mm_info;
+extern struct smram_info *smram;
+#ifdef CONFIG_S3_SUPPORT_SMM
+extern struct s3_comm_info *s3_info;
+#endif
 
 struct generic_register {
 	u8 register_id;
@@ -38,7 +45,7 @@ struct smram_descriptor {
 
 struct smram_info {
 	u32 nr_of_smm_regions;
-	struct smram_descriptor descriptor[1];
+	struct smram_descriptor descriptor[];
 };
 
 struct s3_comm_info {
@@ -56,10 +63,21 @@ struct mm_info {
 
 struct smm_data {
 	u32 nr_of_smm_regions;
-	struct smram_descriptor region[1];
-	struct s3_comm_info s3_info; 
+	struct s3_comm_info s3_info;
 	struct mm_info mm_info;
 	int cpu_count;
+	struct smram_descriptor region[];
 };
 
-#endif
+
+/*
+ * Layout corresponding to the mm_tramp.S
+ */
+
+extern u8 entry32_start;
+/*extern u8 entry32_end;
+
+extern u8 entry64_start;
+extern u8 entry64_end;
+*/
+#endif /* __SMM_H */
